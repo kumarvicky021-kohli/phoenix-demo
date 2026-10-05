@@ -1,13 +1,8 @@
 {
-  "app": "Phoenix",
-  "version": "1.4.0",
-  "date": "2026-10-05",
-  "changelog": [
-    "Token page now matches GMGN/prototype-v4: big MC + ATH bar, risk strip (Dev/Rug/Tax/Insiders/Snipers), bottom Buy/Sell → Instant panel ($10/$50/$100/$500 and 25/50/75/100%)",
-    "Discover → Hot Searches three columns (Age/Hype · 1h Vol/TXs · MC/1h%) — screenshot layout",
-    "Charts draw candles on GitHub Pages too: when DEX APIs are CORS/rate-limited, simulated candles appear immediately + Retry; chart message is a small top banner (does not cover the chart); chart height 300px on phone so it stays above the fold",
-    "Every earlier feature kept: Auto Team, personal bot, Funds, P&L, Copy Trade, bots — only token/Discover UI brought closer to GMGN"
-  ],
-  "download_url": "phoenix.html",
-  "sha256": "a98d3ec806286e8e91802fbf0b483d8af8754cd1d699fc435f70d4e46011edb9"
+  "name": "Phoenix GMGN",
+  "short_name": "Phoenix",
+  "version": "2.0.0",
+  "build": "2.0.0",
+  "description": "GMGN-style mobile UI — DEMO paper trading only",
+  "theme_color": "#0D0D0F"
 }

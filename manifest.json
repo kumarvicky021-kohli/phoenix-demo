@@ -1,19 +1,13 @@
 {
   "app": "Phoenix",
-  "version": "1.3.0",
-  "date": "2026-10-04",
+  "version": "1.4.0",
+  "date": "2026-10-05",
   "changelog": [
-    "New GMGN-style mobile UI (v4): 5 bottom tabs — Discover, Trenches, Track, Traders, You. Every earlier feature is still there",
-    "Trenches = Just-launched (<5 min) list; New / New & Safe / Trending live in the same tab",
-    "Track: holdings + Auto Team + Scorecard + P&L + reports; per-coin Auto Team detail from here",
-    "You → “My bot”: command bot (Hindi/English/Hinglish), Grid/DCA/MA bots, Copy Trade; Traders: smart wallets + Copy Trade",
-    "New watchlist (⭐), Discover banners/entry cards, Buy/Sell bar at the bottom of the token page",
-    "Same reliable chart logic (multi-source race, SIMULATED fallback, status line, Retry); demo money only",
-    "New: source badges on every coin in Trenches/Trending (pump.fun, DexScreener, GeckoTerminal, Jupiter) + a source filter. X/Twitter trending is not available without a paid key — the app says so",
-    "New: give Auto Team a task in Hindi/English/Hinglish (e.g. “sirf pump.fun ke naye coins, mcap 100k-2M, 2% per trade, TP 20 SL 8”) — it shows what it understood, you edit + confirm, then it paper-buys matching coins now",
-    "New: demo funds — Add / Remove / Set with history (not counted as P&L). Every position shows Invested, Value now, P&L ($ and %), plus total invested and total P&L",
-    "Data migration v1.2.x → v1.3.0 (schema 5): balance, trades, bots, copy wallets, Auto Team all preserved; old version at /old/"
+    "Token page now matches GMGN/prototype-v4: big MC + ATH bar, risk strip (Dev/Rug/Tax/Insiders/Snipers), bottom Buy/Sell → Instant panel ($10/$50/$100/$500 and 25/50/75/100%)",
+    "Discover → Hot Searches three columns (Age/Hype · 1h Vol/TXs · MC/1h%) — screenshot layout",
+    "Charts draw candles on GitHub Pages too: when DEX APIs are CORS/rate-limited, simulated candles appear immediately + Retry; chart message is a small top banner (does not cover the chart); chart height 300px on phone so it stays above the fold",
+    "Every earlier feature kept: Auto Team, personal bot, Funds, P&L, Copy Trade, bots — only token/Discover UI brought closer to GMGN"
   ],
   "download_url": "phoenix.html",
-  "sha256": "ecc5ebb495b21c382fd068e7cbfcca7bcdeb5a20d271a0ea2e16dfaadcbd3de0"
+  "sha256": "a98d3ec806286e8e91802fbf0b483d8af8754cd1d699fc435f70d4e46011edb9"
 }

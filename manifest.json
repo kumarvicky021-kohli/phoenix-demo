@@ -1,8 +1,8 @@
 {
   "name": "Phoenix GMGN",
   "short_name": "Phoenix",
-  "version": "2.6.0",
-  "build": "2.6.0",
-  "description": "GMGN-style mobile UI · always-live DexScreener/GeckoTerminal/Jupiter/pump.fun lists · Trenches · Bot Team settings · live charts + P&L · trade history · live risk (RugCheck) · multichain (Solana · Ethereum · BSC · Base · Arbitrum · Robinhood Chain) coin search + paste-any-wallet paper copy trade · GoPlus EVM risk · live 1s charts · manual TP/SL + MC targets · exact copy trade · DEX PAID badges — DEMO paper trading only",
+  "version": "2.8.0",
+  "build": "2.8.0",
+  "description": "GMGN-style mobile UI · always-live DexScreener/GeckoTerminal/Jupiter/pump.fun lists · Trenches · Bot Team settings · live charts + P&L · trade history · live risk (RugCheck) · multichain (Solana · Ethereum · BSC · Base · Arbitrum · Robinhood Chain) coin search + paste-any-wallet paper copy trade · GoPlus EVM risk · live 1s charts · manual TP/SL + MC targets · exact copy trade · DEX PAID badges · Phoenix bot (chat + voice, command-only category buys) · Sniper (new-born / almost-bonded / migration paper sniping, parallel buys, TP/SL, liquidity/honeypot/rug checks, ms latency) — DEMO paper trading only",
   "theme_color": "#0D0D0F"
 }

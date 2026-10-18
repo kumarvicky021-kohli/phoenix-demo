@@ -1,0 +1,345 @@
+<!doctype html><html lang="hi"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#0b0d10">
+<title>Vivaan 4/5 Bot — PAPER (demo)</title><style>:root{--bg:#0b0d10;--card:#14171c;--card2:#1b1f26;--bd:#262b33;--tx:#e8eaed;--mu:#8a919c;--g:#16c784;--r:#ea3943;--y:#f0b90b;--b:#3b82f6}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+body{margin:0;background:var(--bg);color:var(--tx);font:14px/1.4 -apple-system,Roboto,"Noto Sans",system-ui,sans-serif;padding-bottom:70px}
+header{position:sticky;top:0;z-index:5;background:#0b0d10ee;backdrop-filter:blur(6px);display:flex;align-items:center;gap:8px;padding:10px 12px;border-bottom:1px solid var(--bd)}
+header h1{font-size:16px;margin:0;flex:1}.badge{font-size:10px;font-weight:700;padding:2px 6px;border-radius:4px;background:#f0b90b22;color:var(--y);border:1px solid #f0b90b55}
+button{font:inherit;color:var(--tx);background:var(--card2);border:1px solid var(--bd);border-radius:8px;padding:8px 12px}
+button.pri{background:var(--g);color:#000;border:0;font-weight:700}button.dan{background:#ea394322;color:var(--r);border-color:#ea394355}button.sm{padding:4px 8px;font-size:12px}
+.pg{display:none;padding:10px 12px}.pg.on{display:block}
+.card{background:var(--card);border:1px solid var(--bd);border-radius:12px;padding:12px;margin-bottom:10px}
+.card h3{margin:0 0 8px;font-size:13px;color:var(--mu);font-weight:600;text-transform:uppercase;letter-spacing:.4px}
+.big{font-size:26px;font-weight:800}.g{color:var(--g)}.r{color:var(--r)}.y{color:var(--y)}.mu{color:var(--mu)}.sm{font-size:12px}
+.grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}.grid2{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.st{background:var(--card2);border-radius:8px;padding:8px}.st b{display:block;font-size:16px}.st span{font-size:11px;color:var(--mu)}
+nav{position:fixed;bottom:0;left:0;right:0;display:flex;background:#0f1216;border-top:1px solid var(--bd);z-index:6}
+nav a{flex:1;text-align:center;padding:8px 0 10px;color:var(--mu);font-size:11px;text-decoration:none}nav a i{display:block;font-style:normal;font-size:18px}nav a.on{color:var(--g)}
+.row{display:flex;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid var(--bd)}.row:last-child{border:0}.f1{flex:1;min-width:0}
+.pill{font-size:10px;font-weight:700;padding:2px 6px;border-radius:10px}.pill.ok{background:#16c78422;color:var(--g)}.pill.no{background:#ea394322;color:var(--r)}.pill.w{background:#f0b90b22;color:var(--y)}
+.log{font-size:12px;padding:6px 0;border-bottom:1px solid var(--bd)}.log .t{color:var(--mu);font-size:11px}
+label.s{display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid var(--bd);gap:8px}label.s input[type=number]{width:90px;background:var(--card2);border:1px solid var(--bd);color:var(--tx);border-radius:6px;padding:6px;text-align:right;font:inherit}
+.bar{height:8px;background:var(--card2);border-radius:4px;overflow:hidden}.bar i{display:block;height:100%;background:var(--g)}
+canvas{width:100%;height:140px;display:block}
+.warn{background:#f0b90b14;border:1px solid #f0b90b44;color:#f5d36a;border-radius:10px;padding:10px;font-size:12px;margin-bottom:10px}
+.dots{display:flex;gap:4px;flex-wrap:wrap}.dots i{width:22px;height:22px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-style:normal;font-size:11px;font-weight:700}.dots i.w{background:#16c78433;color:var(--g)}.dots i.l{background:#ea394333;color:var(--r)}.dots i.e{background:var(--card2);color:var(--mu)}
+table{width:100%;border-collapse:collapse;font-size:12px}td,th{padding:5px 4px;border-bottom:1px solid var(--bd);text-align:left}th{color:var(--mu);font-weight:600}
+select{background:var(--card2);color:var(--tx);border:1px solid var(--bd);border-radius:8px;padding:8px;font:inherit}
+</style></head><body>
+<header><h1>🎯 Vivaan 4/5 Bot</h1><span class="badge">PAPER</span><button class="sm" id="lang">EN</button><button class="sm pri" id="runBtn">▶</button></header>
+<div class="pg on" id="pg-home"></div><div class="pg" id="pg-coins"></div><div class="pg" id="pg-log"></div><div class="pg" id="pg-hist"></div><div class="pg" id="pg-bt"></div><div class="pg" id="pg-set"></div>
+<nav id="nav"></nav>
+<script>/* Vivaan 4/5 Bot — pure engine (no DOM). PAPER ONLY. Shared by live mode, backtest and headless tests. */
+(function (root) {
+  'use strict';
+  const DEF = {
+    startBal: 1000, slPct: 2, tpPct: 8, trailOn: false, trailAct: 7, trailGap: 1.5,
+    riskPct: 1, maxPosPct: 20, maxOpen: 3, lossStreakStop: 2, dayLossStop: 3,
+    minLiq: 250000, minVol: 500000, minAgeH: 24, maxRtCost: 0.6, minRR: 3.5,
+    rsiLow: 40, volMult: 1.2, pullbackBars: 10, touchTol: 0.3,
+    netCostSide: 0.02, slipBuf: 0.05, defFeeSide: 0.25,
+    targetWin10: 8, targetTph: 10, scanSec: 60
+  };
+  const R = (hi, en) => ({ hi, en });
+  function ema(v, n) { const k = 2 / (n + 1), o = new Array(v.length).fill(NaN); let e = NaN, s = 0; for (let i = 0; i < v.length; i++) { if (i < n - 1) { s += v[i]; continue; } if (i === n - 1) { s += v[i]; e = s / n; } else e = v[i] * k + e * (1 - k); o[i] = e; } return o; }
+  function rsi(c, n = 14) { const o = new Array(c.length).fill(NaN); if (c.length <= n) return o; let g = 0, l = 0; for (let i = 1; i <= n; i++) { const d = c[i] - c[i - 1]; if (d > 0) g += d; else l -= d; } g /= n; l /= n; o[n] = l === 0 ? 100 : 100 - 100 / (1 + g / l); for (let i = n + 1; i < c.length; i++) { const d = c[i] - c[i - 1]; g = (g * (n - 1) + Math.max(d, 0)) / n; l = (l * (n - 1) + Math.max(-d, 0)) / n; o[i] = l === 0 ? 100 : 100 - 100 / (1 + g / l); } return o; }
+  /* candles: [{t(ms),o,h,l,c,v}] ascending. Aggregate 1m -> 5m (only complete buckets). */
+  function agg(c1, mins = 5) { const ms = mins * 60e3, out = []; let cur = null; for (const b of c1) { const t = Math.floor(b.t / ms) * ms; if (!cur || cur.t !== t) { if (cur) out.push(cur); cur = { t, o: b.o, h: b.h, l: b.l, c: b.c, v: b.v, n: 1 }; } else { cur.h = Math.max(cur.h, b.h); cur.l = Math.min(cur.l, b.l); cur.c = b.c; cur.v += b.v; cur.n++; } } if (cur) out.push(cur); return out; }
+  /* Cost model (percent). side = pool fee + price impact (constant-product estimate, conservative for CLMM) + network + slippage buffer */
+  function cost(sizeUsd, liqUsd, feeSide, cfg) { cfg = cfg || DEF; const fee = feeSide == null ? cfg.defFeeSide : feeSide; const impact = liqUsd > 0 ? sizeUsd / (liqUsd / 2) * 100 : 99; const side = fee + impact + cfg.netCostSide + cfg.slipBuf; return { fee, impact, side, rt: side * 2 }; }
+  /* Position sizing */
+  function size(balance, cash, cfg) { cfg = cfg || DEF; const riskAmt = balance * cfg.riskPct / 100; const raw = riskAmt / (cfg.slPct / 100); const cap = balance * cfg.maxPosPct / 100; let s = Math.min(raw, cap, cash); const by = s === raw ? 'risk' : s === cap ? 'cap' : 'cash'; s = Math.max(0, Math.floor(s * 100) / 100); return { size: s, riskAmt, raw, cap, by, actualRiskPct: balance > 0 ? s * cfg.slPct / balance : 0 }; }
+  /* Math explainer */
+  function math(cfg, rtCost) { cfg = cfg || DEF; const c = rtCost == null ? 0.6 : rtCost; const W = cfg.tpPct - c, L = cfg.slPct + c; return { lossesPerWinGross: cfg.tpPct / cfg.slPct, lossesPerWinNet: W / L, ev45gross: 4 * cfg.tpPct - cfg.slPct, ev45net: 4 * W - L, ev810net: 8 * W - 2 * L, breakevenGross: cfg.slPct / (cfg.tpPct + cfg.slPct) * 100, breakevenNet: L / (W + L) * 100, W, L }; }
+  /* Indicator pack for a 1m series and its 5m series. Returns per-bar arrays. */
+  function pack(c1, c5) { const cl1 = c1.map(b => b.c), cl5 = c5.map(b => b.c); return { e20: ema(cl1, 20), r: rsi(cl1, 14), e50_5: ema(cl5, 50), e20_5: ema(cl5, 20) }; }
+  /* Signal on CLOSED 1m bar i. j5 = index of last CLOSED 5m bar at that time. hi = recent swing high (resistance) for R:R. */
+  function signalAt(c1, c5, P, i, j5, cfg) {
+    cfg = cfg || DEF; const rs = []; const b = c1[i];
+    if (j5 < 50 || i < 30) return { ok: false, code: 'warm', rs: [R('Data kam hai (warmup)', 'Not enough candles yet (warmup)')] };
+    const e50 = P.e50_5[j5], e205 = P.e20_5[j5], c5c = c5[j5].c;
+    if (!(c5c > e50 && e205 > e50)) return { ok: false, code: 'trend', rs: [R(`5m trend kamzor: price ${fmt(c5c)} EMA50 ${fmt(e50)} se upar nahi / EMA20<EMA50`, `5m trend weak: price not above EMA50 or EMA20<EMA50`)] };
+    rs.push(R('5m trend UP ✓ (price > EMA50, EMA20 > EMA50)', '5m trend UP ✓ (price > EMA50, EMA20 > EMA50)'));
+    const N = cfg.pullbackBars; let touched = false, minR = 100;
+    for (let k = i - N; k < i; k++) { if (k < 0) continue; if (c1[k].l <= P.e20[k] * (1 + cfg.touchTol / 100)) touched = true; if (P.r[k] < minR) minR = P.r[k]; }
+    if (!touched) return { ok: false, code: 'nopb', rs: rs.concat(R(`1m pe EMA20 tak pullback nahi aaya (last ${N} candles)`, `No pullback to 1m EMA20 in last ${N} candles`)) };
+    if (!(minR < cfg.rsiLow)) return { ok: false, code: 'rsi', rs: rs.concat(R(`RSI ${cfg.rsiLow} ke neeche nahi gaya (min ${minR.toFixed(0)})`, `RSI did not dip below ${cfg.rsiLow} (min ${minR.toFixed(0)})`)) };
+    const rN = P.r[i], rP = P.r[i - 1];
+    if (!(rN >= cfg.rsiLow && rN > rP)) return { ok: false, code: 'rsiwait', rs: rs.concat(R(`RSI abhi recover nahi hua (${rN.toFixed(0)})`, `RSI not recovered yet (${rN.toFixed(0)})`)) };
+    if (!(b.c > P.e20[i] && b.c > b.o)) return { ok: false, code: 'candle', rs: rs.concat(R('Candle green nahi / EMA20 ke upar close nahi', 'Candle not green / not closed above EMA20')) };
+    let vs = 0; for (let k = i - 20; k < i; k++) vs += c1[k].v; const va = vs / 20;
+    if (!(b.v >= va * cfg.volMult)) return { ok: false, code: 'vol', rs: rs.concat(R(`Volume kam: ${(b.v / (va || 1)).toFixed(2)}x avg (chahiye ${cfg.volMult}x)`, `Volume low: ${(b.v / (va || 1)).toFixed(2)}x avg (need ${cfg.volMult}x)`)) };
+    rs.push(R(`Pullback EMA20 ✓, RSI ${minR.toFixed(0)}→${rN.toFixed(0)} ✓, volume ${(b.v / va).toFixed(1)}x ✓`, `Pullback to EMA20 ✓, RSI ${minR.toFixed(0)}→${rN.toFixed(0)} ✓, volume ${(b.v / va).toFixed(1)}x ✓`));
+    /* expected reward = room up to older resistance (max high of 5m bars from 12h ago to 2h ago — the current swing is excluded) capped at TP; if price is above that old high -> room = TP */
+    let hi = 0; for (let k = Math.max(0, j5 - 144); k <= j5 - 24; k++) hi = Math.max(hi, c5[k].h);
+    const room = hi > b.c * 1.002 ? (hi / b.c - 1) * 100 : cfg.tpPct; const rew = Math.min(cfg.tpPct, room); const rr = rew / cfg.slPct;
+    if (rr < cfg.minRR) return { ok: false, code: 'rr', rr, rs: rs.concat(R(`R:R ${rr.toFixed(2)} < ${cfg.minRR} — upar resistance sirf ${room.toFixed(1)}% door`, `R:R ${rr.toFixed(2)} < ${cfg.minRR} — resistance only ${room.toFixed(1)}% away`)) };
+    rs.push(R(`R:R ${rr.toFixed(2)} ≥ ${cfg.minRR} ✓ (reward ${rew.toFixed(1)}% / risk ${cfg.slPct}%)`, `R:R ${rr.toFixed(2)} ≥ ${cfg.minRR} ✓ (reward ${rew.toFixed(1)}% / risk ${cfg.slPct}%)`));
+    return { ok: true, code: 'buy', rr, rs };
+  }
+  /* Exit check on a price (or bar low/high). pos: {entryMid, peak, trailing}. returns {why, px} */
+  function exitCheck(pos, lo, hi, cfg) {
+    cfg = cfg || DEF; const sl = pos.entryMid * (1 - cfg.slPct / 100), tp = pos.entryMid * (1 + cfg.tpPct / 100);
+    if (lo <= sl) return { why: 'SL', px: sl };
+    if (cfg.trailOn) { const act = pos.entryMid * (1 + cfg.trailAct / 100); if (pos.trailing) { const ts = Math.max(act, (pos.peak || pos.entryMid) * (1 - cfg.trailGap / 100)); if (lo <= ts) return { why: 'TRAIL', px: Math.min(ts, hi) }; } pos.peak = Math.max(pos.peak || pos.entryMid, hi); if (pos.peak >= act) pos.trailing = true; return null; }
+    if (hi >= tp) return { why: 'TP', px: tp };
+    return null;
+  }
+  /* Day helpers (IST) */
+  const dayKey = (ms) => { const d = new Date(ms + 5.5 * 3600e3); return d.toISOString().slice(0, 10); };
+  /* Daily stop evaluation. day: {key, startBal, pnl, streak, paused, why} */
+  function dayUpdate(day, ms, bal) { const k = dayKey(ms); if (!day || day.key !== k) return { key: k, startBal: bal, pnl: 0, streak: 0, paused: false, why: null, trades: 0 }; return day; }
+  function dayAfterTrade(day, pnl, cfg) { cfg = cfg || DEF; day.pnl += pnl; day.trades++; day.streak = pnl < 0 ? day.streak + 1 : 0; if (day.streak >= cfg.lossStreakStop) { day.paused = true; day.why = R(`Lagatar ${day.streak} loss — aaj ke liye pause, kal phir chalega`, `${day.streak} losses in a row — paused until tomorrow`); } else if (day.pnl <= -day.startBal * cfg.dayLossStop / 100) { day.paused = true; day.why = R(`Aaj ka loss ${(day.pnl / day.startBal * 100).toFixed(2)}% (limit -${cfg.dayLossStop}%) — kal tak pause`, `Day loss ${(day.pnl / day.startBal * 100).toFixed(2)}% (limit -${cfg.dayLossStop}%) — paused until tomorrow`); } return day; }
+  /* Stats over closed trades [{pnl, pnlPct, ...}] */
+  function stats(tr, cfg) {
+    cfg = cfg || DEF; const n = tr.length, w = tr.filter(t => t.pnl > 0), l = tr.filter(t => t.pnl <= 0);
+    const gw = w.reduce((a, t) => a + t.pnl, 0), gl = -l.reduce((a, t) => a + t.pnl, 0);
+    const last10 = tr.slice(-10), w10 = last10.filter(t => t.pnl > 0).length;
+    const blocks = []; for (let i = 0; i + 10 <= n; i += 10) { const b = tr.slice(i, i + 10), bw = b.filter(t => t.pnl > 0).length; blocks.push({ no: i / 10 + 1, wins: bw, pnl: b.reduce((a, t) => a + t.pnl, 0), hit: bw >= cfg.targetWin10 }); }
+    const curBlock = tr.slice(Math.floor(n / 10) * 10);
+    return { n, wins: w.length, losses: l.length, winRate: n ? w.length / n * 100 : 0, avgWinPct: w.length ? w.reduce((a, t) => a + t.pnlPct, 0) / w.length : 0, avgLossPct: l.length ? l.reduce((a, t) => a + t.pnlPct, 0) / l.length : 0, pf: gl > 0 ? gw / gl : (gw > 0 ? Infinity : 0), expPct: n ? tr.reduce((a, t) => a + t.pnlPct, 0) / n : 0, expUsd: n ? (gw - gl) / n : 0, total: gw - gl, w10, n10: last10.length, blocks, curBlock: { n: curBlock.length, wins: curBlock.filter(t => t.pnl > 0).length } };
+  }
+  function tradesLastHour(tr, open, now) { const h = now - 3600e3; return tr.filter(t => t.tIn >= h).length + (open || []).filter(p => p.tIn >= h).length; }
+  /* ---------- Backtest: portfolio replay over 1m candles of many tokens ---------- */
+  function backtest(series, cfg, opt) {
+    cfg = Object.assign({}, DEF, cfg || {}); opt = opt || {};
+    /* series: [{sym, liq, feeSide, c1:[...]}] */
+    const S = series.filter(s => s.c1 && s.c1.length > 300).map(s => { const c5 = agg(s.c1, 5); const P = pack(s.c1, c5); const idx5 = []; let j = -1; for (let i = 0; i < s.c1.length; i++) { const t = s.c1[i].t; while (j + 1 < c5.length && c5[j + 1].t + 5 * 60e3 <= t + 60e3) j++; idx5.push(j); } const map = new Map(); s.c1.forEach((b, i) => map.set(b.t, i)); return Object.assign({}, s, { c5, P, idx5, map }); });
+    const startT = opt.fromT || 0; const times = [...new Set(S.flatMap(s => s.c1.map(b => b.t)))].filter(t => t >= startT).sort((a, b) => a - b);
+    let bal = cfg.startBal, day = null, open = [], tr = [], eq = [], blockedDay = 0, signals = 0, skipCost = 0, skipSlots = 0;
+    for (const t of times) {
+      day = dayUpdate(day, t, bal);
+      /* exits first (on this bar) */
+      for (const p of open.slice()) { const s = S[p.si], i = s.map.get(t); if (i == null || i <= p.iIn) continue; const b = s.c1[i]; const ex = exitCheck(p, b.l, b.h, cfg); if (ex) { const sell = ex.px * (1 - p.side / 100); const pnl = p.qty * sell - p.size; bal += pnl; tr.push({ sym: s.sym, tIn: p.tIn, tOut: t, size: p.size, why: ex.why, pnl, pnlPct: pnl / p.size * 100, mins: (t - p.tIn) / 60e3, rs: p.rs }); open.splice(open.indexOf(p), 1); dayAfterTrade(day, pnl, cfg); } }
+      /* entries: signal on bar closed at t, fill at next bar open */
+      for (let si = 0; si < S.length; si++) {
+        const s = S[si], i = s.map.get(t); if (i == null || i + 1 >= s.c1.length) continue;
+        const sg = signalAt(s.c1, s.c5, s.P, i, s.idx5[i], cfg); if (!sg.ok) continue; signals++;
+        if (day.paused) { blockedDay++; continue; }
+        if (open.length >= cfg.maxOpen || open.some(p => p.si === si)) { skipSlots++; continue; }
+        const cash = bal - open.reduce((a, p) => a + p.size, 0); const z = size(bal, cash, cfg); const c = cost(z.size, s.liq, s.feeSide, cfg);
+        if (c.rt > cfg.maxRtCost || z.size < 1) { skipCost++; continue; }
+        const nb = s.c1[i + 1], mid = nb.o, buy = mid * (1 + c.side / 100);
+        open.push({ si, iIn: i + 1, tIn: nb.t, entryMid: mid, peak: mid, size: z.size, qty: z.size / buy, side: c.side, rs: sg.rs });
+      }
+      if (!eq.length || t - eq[eq.length - 1].t >= 15 * 60e3) eq.push({ t, v: bal });
+    }
+    /* mark open at last close (unrealised) */
+    const unreal = open.map(p => { const s = S[p.si], b = s.c1[s.c1.length - 1]; const sell = b.c * (1 - p.side / 100); return { sym: s.sym, pnl: p.qty * sell - p.size, mins: (b.t - p.tIn) / 60e3 }; });
+    const st = stats(tr, cfg); const hours = times.length ? (times[times.length - 1] - times[0]) / 3600e3 : 0;
+    const tps = tr.filter(x => x.why === 'TP' || x.why === 'TRAIL'), sls = tr.filter(x => x.why === 'SL');
+    const avg = a => a.length ? a.reduce((x, y) => x + y, 0) / a.length : null;
+    /* raw-market probe: how often does ANY universe token move +TP% within 60 min / before -SL% */
+    let probes = 0, hit60 = 0, tpFirst = 0, ttp = [];
+    for (const s of S) { const c = s.c1; for (let i = 0; i < c.length - 1; i += 5) { if (c[i].t < startT) continue; probes++; const e = c[i].c, up = e * (1 + cfg.tpPct / 100), dn = e * (1 - cfg.slPct / 100); let res = 0; for (let k = i + 1; k < c.length; k++) { if (c[k].l <= dn) { res = -1; break; } if (c[k].h >= up) { res = 1; ttp.push((c[k].t - c[i].t) / 60e3); if (k - i <= 60) hit60++; break; } } if (res === 1) tpFirst++; } }
+    return { cfg, hours, tokens: S.map(s => s.sym), st, trades: tr, unreal, eq, bal, signals, blockedDay, skipSlots, skipCost, tph: hours ? tr.length / hours : 0, avgTtpMin: avg(tps.map(x => x.mins)), avgTslMin: avg(sls.map(x => x.mins)), probe: { probes, hit60Pct: probes ? hit60 / probes * 100 : 0, tpFirstPct: probes ? tpFirst / probes * 100 : 0, medTtp: ttp.length ? ttp.sort((a, b) => a - b)[Math.floor(ttp.length / 2)] : null } };
+  }
+  function fmt(x) { if (!isFinite(x)) return '-'; const a = Math.abs(x); return a >= 1000 ? x.toFixed(0) : a >= 1 ? x.toFixed(3) : a >= 0.01 ? x.toFixed(5) : x.toPrecision(4); }
+  root.V45E = { DEF, ema, rsi, agg, cost, size, math, pack, signalAt, exitCheck, dayKey, dayUpdate, dayAfterTrade, stats, tradesLastHour, backtest, fmt, R };
+  if (typeof module !== 'undefined') module.exports = root.V45E;
+})(typeof window !== 'undefined' ? window : globalThis);
+</script><script>/* Vivaan 4/5 Bot — public data layer (DexScreener, GeckoTerminal, RugCheck, GoPlus). No Jupiter. No keys. */
+(function (root) {
+  'use strict';
+  const E = root.V45E || (typeof require !== 'undefined' ? require('./engine.js') : null), R = E.R;
+  const DS = 'https://api.dexscreener.com', GT = 'https://api.geckoterminal.com/api/v2';
+  const CORE = [
+    ['SOL', 'So11111111111111111111111111111111111111112'], ['JUP', 'JUPyiwrYJFskUPiHa7hkeR8VUtAeFoSYbKedZNsDvCN'], ['BONK', 'DezXAZ8z7PnrnRJjz3wXBoRgixCa6xjnB7YaB1pPB263'], ['WIF', 'EKpQGSJtjMFqKZ9KQanSqYXRcF8fBopzLHYxdM65zcjm'],
+    ['POPCAT', '7GCihgDB8fe6KNjn2MYtkzZcRjQy3t9GHdC8uHYmW2hr'], ['JTO', 'jtojtomepa8beP8AuQc6eXt5FriJwfFMwQx2v2f9mCL'], ['RAY', '4k3Dyjzvzp8eMZWUXbBCjEvwSkkk59S5iCNLY3QrkX6R'],
+    ['PYTH', 'HZ1JovNiVvGrGNiiYvEozEVgZ58xaU3RKwX8eACQBCt3'], ['TRUMP', '6p6xgHyF7AeE6TZkSmFsko444wqoP15icUSqi2jfGiPN'], ['FARTCOIN', '9BB6NFEcjBCtnNLFko2FqVQBq8HHM13kCyYcdQbgpump'],
+    ['MEW', 'MEW1gQWJ3nEXg2qgERiKu7FAFj79PHvQVREQUzScPP5'], ['PENGU', '2zMMhcVQEXDtdE6vsFS7S7D5oUodfJHE8vd1gnBouauv'], ['W', '85VBFQZC9TZkfaptBWjvUw7YbZjy52A6mjtPGjstQAmQ'],
+    ['RENDER', 'rndrizKT3MK1iimdxRdWabcF7Zg7AR5T4nud4EkHBof'], ['ORCA', 'orcaEKTdK7LKz57vaAYr9QeNsVEPfiu6QeMU1kektZE'], ['GIGA', '63LfDmNb3MQ8mw9MtZ2To9bEA2M71kZUUGq5tiJxcqj9'], ['MOODENG', 'ED5nyyWEzpPPiWimP8vYm7sD7TD3LAt3Q3gRTWHzPJBY']
+  ];
+  const QUOTES = new Set(['So11111111111111111111111111111111111111112', 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v', 'Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB']);
+  /* rate-limited GeckoTerminal queue (public limit ~30/min; we stay at ~15/min) */
+  let gtLast = 0; const GT_GAP = 4000; let gtChain = Promise.resolve();
+  function gtGet(path) { const p = gtChain.then(async () => { const w = gtLast + GT_GAP - Date.now(); if (w > 0) await sleep(w); gtLast = Date.now(); return jgetGT(GT + path); }); gtChain = p.catch(() => {}); return p; }
+  /* GeckoTerminal: a 429 from its CDN often arrives without CORS headers (shows as 'Failed to fetch'), so back off 15s/30s/45s/60s */
+  async function jgetGT(url) { for (let a = 0; ; a++) { try { return await jget(url, 12000, 0); } catch (e) { if (a >= 4 || /HTTP 4(0[0-4])/.test(e.message)) throw e; if (root.V45D && root.V45D.onWait) root.V45D.onWait(15 * (a + 1)); await sleep(15000 * (a + 1)); gtLast = Date.now(); } } }
+  const sleep = ms => new Promise(r => setTimeout(r, ms));
+  async function jget(url, ms, retry) { for (let a = 0; ; a++) { const ac = new AbortController(), to = setTimeout(() => ac.abort(), ms || 8000); try { const r = await fetch(url, { signal: ac.signal, headers: { Accept: 'application/json' } }); if (r.status === 429 && a < (retry || 0)) { await sleep(6000 * (a + 1)); continue; } if (!r.ok) throw new Error('HTTP ' + r.status); return await r.json(); } catch (e) { if (a < (retry || 0) && e.name !== 'AbortError') { await sleep(1500); continue; } throw e.name === 'AbortError' ? new Error('timeout') : e; } finally { clearTimeout(to); } } }
+  /* trending candidates: GeckoTerminal trending pools + DexScreener top boosts (filtered later) */
+  async function trending() { const out = []; try { const d = await gtGet('/networks/solana/trending_pools?page=1'); (d.data || []).forEach(p => { const m = (p.relationships && p.relationships.base_token && p.relationships.base_token.data.id || '').replace('solana_', ''); if (m) out.push([String(p.attributes.name || '').split(' / ')[0], m, 'trend']); }); } catch (e) {} try { const d = await jget(DS + '/token-boosts/top/v1', 8000); (d || []).filter(x => x.chainId === 'solana').slice(0, 15).forEach(x => out.push(['?', x.tokenAddress, 'boost'])); } catch (e) {} return out; }
+  /* resolve token -> best SOL/USDC pair by liquidity, + token-wide 24h volume */
+  async function dsTokens(mints) { const res = []; for (let i = 0; i < mints.length; i += 30) { const d = await jget(DS + '/tokens/v1/solana/' + mints.slice(i, i + 30).join(','), 10000, 1); res.push(...(d || [])); } return res; }
+  async function security(mint, cache) {
+    const c = cache && cache[mint]; if (c && Date.now() - c.t < 6 * 3600e3) return c;
+    const s = { t: Date.now(), rug: null, gp: null, fees: {}, level: 'ok', notes: [] };
+    try { const r = await jget('https://api.rugcheck.xyz/v1/tokens/' + mint + '/report/summary', 8000, 1); s.rug = { score: r.score_normalised, risks: (r.risks || []).map(x => ({ n: x.name, l: x.level })) }; } catch (e) { s.notes.push('rugcheck ' + e.message); }
+    try { const g = await jget('https://api.gopluslabs.io/api/v1/solana/token_security?contract_addresses=' + mint, 8000, 1); const x = g.result && g.result[mint]; if (x) { s.gp = { mint: x.mintable && x.mintable.status, freeze: x.freezable && x.freezable.status, nontr: x.non_transferable, bal: x.balance_mutable_authority && x.balance_mutable_authority.status, hook: (x.transfer_hook || []).length, tfee: x.transfer_fee && Object.keys(x.transfer_fee).length ? 1 : 0, trusted: x.trusted_token }; (x.dex || []).forEach(d => { if (d.id && d.fee_rate) s.fees[d.id] = +d.fee_rate * 100; }); } } catch (e) { s.notes.push('goplus ' + e.message); }
+    const dang = []; if (s.rug) s.rug.risks.filter(x => x.l === 'danger').forEach(x => dang.push('RugCheck: ' + x.n)); if (s.gp) { if (s.gp.freeze === '1') dang.push('GoPlus: freezable'); if (s.gp.nontr === '1') dang.push('GoPlus: non-transferable'); if (s.gp.bal === '1') dang.push('GoPlus: balance mutable'); if (s.gp.hook) dang.push('GoPlus: transfer hook'); if (s.gp.tfee) dang.push('GoPlus: transfer fee'); if (s.gp.mint === '1') s.notes.push('GoPlus: mintable (warn)'); }
+    if (!s.rug && !s.gp) s.level = 'unknown'; else if (dang.length) s.level = 'danger'; s.danger = dang; if (cache) cache[mint] = s; return s;
+  }
+  /* Build universe with filter verdicts. cfg = engine cfg. returns [{sym,mint,pair,dex,liq,vol24,ageH,feeSide,rt,sec,pass,why[]}] */
+  async function universe(cfg, secCache, opts) {
+    opts = opts || {}; const now = Date.now(); let cands = CORE.map(([s, m]) => [s, m, 'core']);
+    if (opts.trending !== false) { const t = await trending(); const seen = new Set(cands.map(c => c[1])); t.forEach(c => { if (!seen.has(c[1]) && !QUOTES.has(c[1])) { seen.add(c[1]); cands.push(c); } }); }
+    const pairs = await dsTokens(cands.map(c => c[1])); const by = {};
+    pairs.forEach(p => { if (p.chainId !== 'solana') return; const m = p.baseToken.address; (by[m] = by[m] || []).push(p); });
+    const out = [];
+    for (const [s0, mint, src] of cands) {
+      const ps = (by[mint] || []).filter(p => QUOTES.has(p.quoteToken.address) && p.dexId !== 'pumpfun');
+      const u = { sym: s0, mint, src, pass: false, why: [] };
+      if (!ps.length) { u.why.push(R('Koi SOL/USDC DEX pair nahi mila', 'No SOL/USDC DEX pair found')); out.push(u); continue; }
+      ps.sort((a, b) => ((b.liquidity || {}).usd || 0) - ((a.liquidity || {}).usd || 0)); const p = ps[0];
+      Object.assign(u, { sym: p.baseToken.symbol || s0, pair: p.pairAddress, dex: p.dexId, quote: p.quoteToken.symbol, liq: (p.liquidity || {}).usd || 0, vol24: (by[mint] || []).reduce((a, x) => a + ((x.volume || {}).h24 || 0), 0), pairVol24: (p.volume || {}).h24 || 0, ageH: p.pairCreatedAt ? (now - p.pairCreatedAt) / 3600e3 : 0, price: +p.priceUsd || 0, chg24: (p.priceChange || {}).h24 });
+      if (/pump$/.test(mint) && u.ageH < 72 && src !== 'core') u.why.push(R('pump.fun new-born — skip', 'pump.fun new-born — skipped'));
+      if (u.liq < cfg.minLiq) u.why.push(R(`Liquidity $${k(u.liq)} < $${k(cfg.minLiq)}`, `Liquidity $${k(u.liq)} < $${k(cfg.minLiq)}`));
+      if (u.vol24 < cfg.minVol) u.why.push(R(`24h volume $${k(u.vol24)} < $${k(cfg.minVol)}`, `24h volume $${k(u.vol24)} < $${k(cfg.minVol)}`));
+      if (u.ageH < cfg.minAgeH) u.why.push(R(`Pair sirf ${u.ageH.toFixed(1)}h purana (chahiye ${cfg.minAgeH}h)`, `Pair only ${u.ageH.toFixed(1)}h old (need ${cfg.minAgeH}h)`));
+      out.push(u);
+    }
+    /* security + cost only for those passing basic filters (saves API calls) */
+    for (const u of out) { if (!u.pair || u.why.length) continue; u.sec = await security(u.mint, secCache); u.feeSide = u.sec.fees[u.pair] != null ? u.sec.fees[u.pair] : cfg.defFeeSide; const z = E.size(opts.balance || cfg.startBal, opts.balance || cfg.startBal, cfg); u.cost = E.cost(z.size, u.liq, u.feeSide, cfg); u.rt = u.cost.rt;
+      if (u.rt > cfg.maxRtCost) u.why.push(R(`Round-trip cost ${u.rt.toFixed(2)}% > ${cfg.maxRtCost}% (fee ${u.feeSide.toFixed(2)}%/side)`, `Round-trip cost ${u.rt.toFixed(2)}% > ${cfg.maxRtCost}% (fee ${u.feeSide.toFixed(2)}%/side)`));
+      if (u.sec.level === 'danger') u.why.push(R('Safety FAIL: ' + u.sec.danger.join(', '), 'Safety FAIL: ' + u.sec.danger.join(', ')));
+      if (u.sec.level === 'unknown') u.why.push(R('Safety check nahi ho paya (RugCheck/GoPlus down)', 'Safety check unavailable (RugCheck/GoPlus down)'));
+      u.pass = !u.why.length; }
+    return out;
+  }
+  function k(x) { return x >= 1e6 ? (x / 1e6).toFixed(2) + 'M' : x >= 1e3 ? (x / 1e3).toFixed(0) + 'k' : (x || 0).toFixed(0); }
+  const toBars = (l) => (l || []).map(r => ({ t: r[0] * 1000, o: +r[1], h: +r[2], l: +r[3], c: +r[4], v: +r[5] })).sort((a, b) => a.t - b.t);
+  /* recent candles: tf 'minute' agg 1 or 5 */
+  async function candles(pool, agg, limit) { const d = await gtGet(`/networks/solana/pools/${pool}/ohlcv/minute?aggregate=${agg}&limit=${limit}&currency=usd`); return toBars(d.data && d.data.attributes && d.data.attributes.ohlcv_list); }
+  /* history of 1m candles covering `hours` (paged, 1000/call) */
+  async function history1m(pool, hours, onPage) { let before = Math.floor(Date.now() / 1000), all = []; const need = Math.ceil(hours * 60); while (all.length < need) { const d = await gtGet(`/networks/solana/pools/${pool}/ohlcv/minute?aggregate=1&limit=1000&currency=usd&before_timestamp=${before}`); const b = toBars(d.data && d.data.attributes && d.data.attributes.ohlcv_list); if (!b.length) break; all = b.concat(all); before = Math.floor(b[0].t / 1000); if (onPage) onPage(all.length, need); if (b.length < 900) break; } const m = new Map(); all.forEach(x => m.set(x.t, x)); return [...m.values()].sort((a, b) => a.t - b.t); }
+  /* live prices for up to 30 pairs per call */
+  async function prices(pairs) { const o = {}; for (let i = 0; i < pairs.length; i += 30) { const d = await jget(DS + '/latest/dex/pairs/solana/' + pairs.slice(i, i + 30).join(','), 6000); (d.pairs || []).forEach(p => { o[p.pairAddress] = +p.priceUsd; }); } return o; }
+  /* fill gaps: GeckoTerminal omits 1m bars without trades; forward-fill so EMAs are time-consistent */
+  function fill(c1) { if (!c1.length) return c1; const o = [c1[0]]; for (let i = 1; i < c1.length; i++) { let p = o[o.length - 1]; while (c1[i].t - p.t > 60e3 && o.length < 1e6) { p = { t: p.t + 60e3, o: p.c, h: p.c, l: p.c, c: p.c, v: 0 }; o.push(p); } o.push(c1[i]); } return o; }
+  root.V45D = { CORE, universe, security, candles, history1m, prices, trending, fill, k, jget };
+  if (typeof module !== 'undefined') module.exports = root.V45D;
+})(typeof window !== 'undefined' ? window : globalThis);
+</script><script>/* Vivaan 4/5 Bot — UI + live paper loop. PAPER MONEY ONLY: no wallet, no keys, no transactions. */
+(function () {
+  'use strict';
+  const E = window.V45E, D = window.V45D, R = E.R, VER = '1.0.0';
+  const $ = (s) => document.querySelector(s), esc = (s) => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
+  const LS = { get(k, d) { try { const v = localStorage.getItem('v45_' + k); return v ? JSON.parse(v) : d; } catch (e) { return d; } }, set(k, v) { try { localStorage.setItem('v45_' + k, JSON.stringify(v)); } catch (e) {} } };
+  let lang = LS.get('lang', 'hi'); const T = (hi, en) => lang === 'hi' ? hi : en; const tr = (r) => r ? (typeof r === 'string' ? r : (lang === 'hi' ? r.hi : r.en)) : '';
+  let cfg = Object.assign({}, E.DEF, LS.get('cfg', {}));
+  const fresh = () => ({ bal: cfg.startBal, startBal: cfg.startBal, open: [], trades: [], eq: [{ t: Date.now(), v: cfg.startBal }], day: null, log: [], running: false, created: Date.now() });
+  let S = Object.assign(fresh(), LS.get('state', {}));
+  let secCache = LS.get('sec', {}), uni = LS.get('uni', { t: 0, list: [] }), c5cache = {}, lastCode = {}, busy = false, lastPx = {}, scanInfo = { t: 0, n: 0, ms: 0, err: null };
+  const save = () => LS.set('state', S);
+  const usd = (x) => (x < 0 ? '-$' : '$') + Math.abs(x).toFixed(2), pct = (x) => (x >= 0 ? '+' : '') + (+x).toFixed(2) + '%', cls = (x) => x > 0 ? 'g' : x < 0 ? 'r' : 'mu';
+  const tm = (ms) => new Date(ms).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata', hour: '2-digit', minute: '2-digit', day: '2-digit', month: 'short', hour12: false });
+  function log(sym, lv, r) { S.log.unshift({ t: Date.now(), sym, lv, r }); if (S.log.length > 400) S.log.length = 400; if (cur === 'log') render(); }
+  /* ---------- trading core (paper) ---------- */
+  function cash() { return S.bal - S.open.reduce((a, p) => a + p.size, 0); }
+  function openPos(u, mid, sg) {
+    S.day = E.dayUpdate(S.day, Date.now(), S.bal);
+    if (S.day.paused) { log(u.sym, 'skip', R('Signal mila par aaj daily-stop laga hai: ' + tr(S.day.why), 'Signal found but daily stop is active: ' + tr(S.day.why))); return null; }
+    if (S.open.length >= cfg.maxOpen) { log(u.sym, 'skip', R(`Signal mila par ${cfg.maxOpen} positions pehle se open hain`, `Signal but already ${cfg.maxOpen} open positions`)); return null; }
+    if (S.open.some(p => p.mint === u.mint)) return null;
+    const z = E.size(S.bal, cash(), cfg); const c = E.cost(z.size, u.liq, u.feeSide, cfg);
+    if (z.size < 1) { log(u.sym, 'skip', R('Cash khatam — size $0', 'No free cash')); return null; }
+    if (c.rt > cfg.maxRtCost) { log(u.sym, 'skip', R(`Cost ${c.rt.toFixed(2)}% > ${cfg.maxRtCost}% — skip`, `Cost ${c.rt.toFixed(2)}% > ${cfg.maxRtCost}% — skip`)); return null; }
+    const buy = mid * (1 + c.side / 100);
+    const p = { id: Date.now() + '' + Math.random().toString(36).slice(2, 6), sym: u.sym, mint: u.mint, pair: u.pair, tIn: Date.now(), entryMid: mid, buyFill: buy, size: z.size, qty: z.size / buy, side: c.side, rt: c.rt, peak: mid, trailing: false, rs: (sg ? sg.rs : []).concat(R(`Size $${z.size} (${z.by === 'cap' ? 'max ' + cfg.maxPosPct + '% cap' : z.by === 'risk' ? 'risk ' + cfg.riskPct + '%' : 'free cash'}), cost ~${c.rt.toFixed(2)}%`, `Size $${z.size} (${z.by === 'cap' ? 'max ' + cfg.maxPosPct + '% cap' : z.by === 'risk' ? 'risk ' + cfg.riskPct + '%' : 'free cash'}), cost ~${c.rt.toFixed(2)}%`)) };
+    S.open.push(p); log(u.sym, 'buy', R(`📥 PAPER BUY $${z.size} @ ${E.fmt(mid)} | SL ${E.fmt(mid * (1 - cfg.slPct / 100))} (-${cfg.slPct}%) | TP ${E.fmt(mid * (1 + cfg.tpPct / 100))} (+${cfg.tpPct}%)`, `📥 PAPER BUY $${z.size} @ ${E.fmt(mid)} | SL -${cfg.slPct}% | TP +${cfg.tpPct}%`)); save(); render(); return p;
+  }
+  function closePos(p, mid, why) {
+    const sell = mid * (1 - p.side / 100), pnl = p.qty * sell - p.size, gross = (mid / p.entryMid - 1) * 100;
+    S.bal += pnl; S.open = S.open.filter(x => x.id !== p.id);
+    const t = { sym: p.sym, mint: p.mint, tIn: p.tIn, tOut: Date.now(), size: p.size, entryMid: p.entryMid, exitMid: mid, gross, pnl, pnlPct: pnl / p.size * 100, why, rs: p.rs, mins: (Date.now() - p.tIn) / 60e3 };
+    S.trades.push(t); S.eq.push({ t: Date.now(), v: S.bal });
+    S.day = E.dayUpdate(S.day, Date.now(), S.bal - pnl); E.dayAfterTrade(S.day, pnl, cfg);
+    const W = { SL: R('Stop-loss lag gaya', 'Stop-loss hit'), TP: R('Take-profit mil gaya', 'Take-profit hit'), TRAIL: R('Trailing stop se profit lock', 'Trailing stop locked profit'), MAN: R('Aapne khud becha', 'Closed manually') }[why];
+    log(p.sym, pnl > 0 ? 'win' : 'loss', R(`📤 SELL (${why}) ${W.hi}: price ${pct(gross)}, net ${usd(pnl)} (${pct(t.pnlPct)} fees/slippage ke baad)`, `📤 SELL (${why}) ${W.en}: price ${pct(gross)}, net ${usd(pnl)} (${pct(t.pnlPct)} after fees/slippage)`));
+    const n = S.trades.length; if (n % 10 === 0) { const b = S.trades.slice(-10), w = b.filter(x => x.pnl > 0).length, bp = b.reduce((a, x) => a + x.pnl, 0); log('BLOCK', w >= cfg.targetWin10 ? 'win' : 'loss', R(`🧾 Block #${n / 10} poora: ${w}/10 jeet (target ${cfg.targetWin10}/10) ${w >= cfg.targetWin10 ? '✅' : '❌'}, P&L ${usd(bp)}`, `🧾 Block #${n / 10} done: ${w}/10 wins (target ${cfg.targetWin10}/10) ${w >= cfg.targetWin10 ? '✅' : '❌'}, P&L ${usd(bp)}`)); }
+    if (S.day.paused) log('DAY', 'stop', S.day.why);
+    save(); render();
+  }
+  function onPrice(p, px) { if (!(px > 0)) return; lastPx[p.pair] = px; const ex = E.exitCheck(p, px, px, cfg); if (ex) closePos(p, px, ex.why); }
+  async function priceLoop() { if (S.open.length) { try { const pr = await D.prices([...new Set(S.open.map(p => p.pair))]); S.open.slice().forEach(p => onPrice(p, pr[p.pair])); if (cur === 'home') renderOpen(); } catch (e) {} } setTimeout(priceLoop, 3000); }
+  async function refreshUni(force) { if (!force && uni.list.length && Date.now() - uni.t < 30 * 60e3) return; log('SCAN', 'info', R('Coins list update ho rahi hai (DexScreener + GeckoTerminal trending)…', 'Refreshing universe (DexScreener + GeckoTerminal trending)…')); const list = await D.universe(cfg, secCache, { balance: S.bal }); uni = { t: Date.now(), list }; LS.set('uni', uni); LS.set('sec', secCache); const ok = list.filter(u => u.pass); log('SCAN', 'info', R(`${list.length} coins check kiye, ${ok.length} filters pass: ${ok.map(u => u.sym).join(', ') || '—'}`, `${list.length} coins checked, ${ok.length} pass filters: ${ok.map(u => u.sym).join(', ') || '—'}`)); if (cur === 'coins') render(); }
+  async function scanOne(u) {
+    const now = Date.now(); let c1 = D.fill(await D.candles(u.pair, 1, 200)); c1 = c1.filter(b => b.t + 60e3 <= now);
+    const cc = c5cache[u.pair]; let c5; if (cc && now - cc.t < 5 * 60e3) c5 = cc.c; else { c5 = await D.candles(u.pair, 5, 220); c5cache[u.pair] = { t: now, c: c5 }; }
+    c5 = c5.filter(b => b.t + 300e3 <= now); if (c1.length < 40 || c5.length < 55) { log(u.sym, 'skip', R('Candles kam mile', 'Too few candles')); return; }
+    const P = E.pack(c1, c5), i = c1.length - 1, sg = E.signalAt(c1, c5, P, i, c5.length - 1, cfg);
+    u.last = { code: sg.code, t: now, px: c1[i].c, rsi: P.r[i] };
+    if (sg.ok) { const pr = await D.prices([u.pair]).catch(() => ({})); const mid = pr[u.pair] || c1[i].c; log(u.sym, 'sig', R('✅ BUY signal: ' + sg.rs.map(r => r.hi).join(' • '), '✅ BUY signal: ' + sg.rs.map(r => r.en).join(' • '))); openPos(u, mid, sg); }
+    else if (lastCode[u.mint] !== sg.code) log(u.sym, 'skip', R('Abhi nahi: ' + sg.rs[sg.rs.length - 1].hi, 'Not now: ' + sg.rs[sg.rs.length - 1].en));
+    lastCode[u.mint] = sg.code;
+  }
+  async function scanLoop() {
+    if (S.running && !busy) { busy = true; const t0 = Date.now(); try { await refreshUni(false); S.day = E.dayUpdate(S.day, Date.now(), S.bal);
+      if (S.day.paused) { if (lastCode.__day !== S.day.key) { log('DAY', 'stop', S.day.why); lastCode.__day = S.day.key; } }
+      else { const L = uni.list.filter(u => u.pass && !S.open.some(p => p.mint === u.mint)); for (const u of L) { if (!S.running) break; try { await scanOne(u); } catch (e) { log(u.sym, 'err', R('Data error: ' + e.message, 'Data error: ' + e.message)); } } scanInfo.n = L.length; }
+      scanInfo.err = null; } catch (e) { scanInfo.err = e.message; log('SCAN', 'err', R('Scan error: ' + e.message, 'Scan error: ' + e.message)); } scanInfo.t = Date.now(); scanInfo.ms = Date.now() - t0; busy = false; save(); if (cur === 'home' || cur === 'coins') render(); }
+    setTimeout(scanLoop, Math.max(5, cfg.scanSec) * 1000);
+  }
+  /* ---------- UI ---------- */
+  const PAGES = [['home', '🏠', 'Home', 'Home'], ['coins', '🪙', 'Coins', 'Coins'], ['log', '📝', 'Log', 'Log'], ['hist', '📜', 'History', 'History'], ['bt', '🧪', 'Backtest', 'Backtest'], ['set', '⚙️', 'Settings', 'Settings']];
+  let cur = 'home';
+  function nav() { $('#nav').innerHTML = PAGES.map(p => `<a href="#" data-p="${p[0]}" class="${cur === p[0] ? 'on' : ''}"><i>${p[1]}</i>${T(p[2], p[3])}</a>`).join(''); }
+  function go(p) { cur = p; document.querySelectorAll('.pg').forEach(e => e.classList.toggle('on', e.id === 'pg-' + p)); nav(); render(); window.scrollTo(0, 0); }
+  function dots(tr10, n) { let h = ''; for (let i = 0; i < n; i++) { const t = tr10[i]; h += t ? `<i class="${t.pnl > 0 ? 'w' : 'l'}">${t.pnl > 0 ? 'W' : 'L'}</i>` : '<i class="e">·</i>'; } return `<div class="dots">${h}</div>`; }
+  function eqChart(cv, pts) { const dpr = window.devicePixelRatio || 1, w = cv.clientWidth || 340, h = cv.clientHeight || 140; cv.width = w * dpr; cv.height = h * dpr; const x = cv.getContext('2d'); x.scale(dpr, dpr); x.clearRect(0, 0, w, h); if (pts.length < 2) { x.fillStyle = '#8a919c'; x.font = '12px sans-serif'; x.fillText(T('Abhi koi trade nahi — curve yahan banegi', 'No trades yet — curve appears here'), 10, h / 2); return; } const vs = pts.map(p => p.v), mn = Math.min(...vs), mx = Math.max(...vs), rg = (mx - mn) || 1; const X = i => 4 + i / (pts.length - 1) * (w - 8), Y = v => h - 8 - (v - mn) / rg * (h - 20); x.strokeStyle = '#333a44'; x.setLineDash([3, 3]); x.beginPath(); x.moveTo(0, Y(pts[0].v)); x.lineTo(w, Y(pts[0].v)); x.stroke(); x.setLineDash([]); x.strokeStyle = vs[vs.length - 1] >= vs[0] ? '#16c784' : '#ea3943'; x.lineWidth = 2; x.beginPath(); pts.forEach((p, i) => i ? x.lineTo(X(i), Y(p.v)) : x.moveTo(X(i), Y(p.v))); x.stroke(); x.fillStyle = '#8a919c'; x.font = '10px sans-serif'; x.fillText('$' + mx.toFixed(0), 4, 10); x.fillText('$' + mn.toFixed(0), 4, h - 1); }
+  function renderOpen() { const el = $('#openBox'); if (!el) return; el.innerHTML = S.open.length ? S.open.map(p => { const px = lastPx[p.pair] || p.entryMid, g = (px / p.entryMid - 1) * 100, net = p.qty * px * (1 - p.side / 100) - p.size; return `<div class="row"><div class="f1"><b>${esc(p.sym)}</b> <span class="mu sm">$${p.size} • ${tm(p.tIn)}</span><div class="sm mu">${T('Entry', 'Entry')} ${E.fmt(p.entryMid)} • SL ${E.fmt(p.entryMid * (1 - cfg.slPct / 100))} • TP ${E.fmt(p.entryMid * (1 + cfg.tpPct / 100))}${p.trailing ? ' • 🔒trail' : ''}</div></div><div style="text-align:right"><b class="${cls(g)}">${pct(g)}</b><div class="sm ${cls(net)}">net ${usd(net)}</div></div><button class="sm dan" data-close="${p.id}">✕</button></div>`; }).join('') : `<div class="mu sm">${T('Koi open position nahi', 'No open positions')}</div>`; }
+  function hHome() {
+    const st = E.stats(S.trades, cfg), now = Date.now(), tph = E.tradesLastHour(S.trades, S.open, now); S.day = E.dayUpdate(S.day, now, S.bal);
+    const m = E.math(cfg, 0.5), pnlAll = S.bal - S.startBal, last10 = S.trades.slice(-10);
+    const status = !S.running ? `<span class="pill w">${T('RUKA HUA', 'STOPPED')}</span>` : S.day.paused ? `<span class="pill no">${T('AAJ PAUSE', 'PAUSED TODAY')}</span>` : `<span class="pill ok">${T('CHAL RAHA', 'RUNNING')}</span>`;
+    return `<div class="warn">🧪 ${T('Ye sirf PAPER money hai (nakli paisa). Koi wallet, key ya asli transaction nahi. Page khula rahega tabhi bot chalega.', 'PAPER money only (fake). No wallet, no keys, no real transactions. Runs only while this page is open.')}</div>
+    <div class="card"><div style="display:flex;justify-content:space-between;align-items:center"><div><div class="mu sm">${T('Paper balance', 'Paper balance')}</div><div class="big">$${S.bal.toFixed(2)}</div><div class="sm ${cls(pnlAll)}">${usd(pnlAll)} (${pct(pnlAll / S.startBal * 100)}) ${T('shuru se', 'since start')}</div></div><div style="text-align:right">${status}<div class="sm mu" style="margin-top:6px">${T('Aaj', 'Today')}: <span class="${cls(S.day.pnl)}">${usd(S.day.pnl)}</span><br>${T('Lagatar loss', 'Loss streak')}: ${S.day.streak}/${cfg.lossStreakStop}</div></div></div>
+    ${S.day.paused ? `<div class="sm r" style="margin-top:8px">⛔ ${esc(tr(S.day.why))}</div>` : ''}<div class="sm mu" style="margin-top:6px">${scanInfo.t ? T('Last scan', 'Last scan') + ': ' + tm(scanInfo.t) + ` • ${scanInfo.n} coins • ${(scanInfo.ms / 1000).toFixed(1)}s` : T('Abhi scan nahi hua — ▶ dabao', 'Not scanned yet — press ▶')}</div></div>
+    <div class="card"><h3>${T('Scorecard (last 10)', 'Scorecard (last 10)')}</h3><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px"><div><span class="big ${st.w10 >= cfg.targetWin10 ? 'g' : st.n10 ? 'y' : 'mu'}">${st.w10}/${Math.max(10, st.n10)}</span> <span class="mu">${T('jeet', 'wins')}</span><div class="sm mu">${T('Target', 'Target')}: ${cfg.targetWin10}/10 (~${cfg.targetWin10 * 10}%) • ${st.n10}/10 ${T('trades hue', 'trades done')}</div></div></div><div style="margin-bottom:10px">${dots(last10, 10)}</div>
+    <div class="grid"><div class="st"><b>${st.winRate.toFixed(0)}%</b><span>${T('Win rate', 'Win rate')} (${st.n})</span></div><div class="st"><b class="g">${pct(st.avgWinPct)}</b><span>${T('Avg jeet', 'Avg win')}</span></div><div class="st"><b class="r">${pct(st.avgLossPct)}</b><span>${T('Avg loss', 'Avg loss')}</span></div>
+    <div class="st"><b>${st.pf === Infinity ? '∞' : st.pf.toFixed(2)}</b><span>Profit factor</span></div><div class="st"><b class="${cls(st.expPct)}">${pct(st.expPct)}</b><span>${T('Expectancy/trade', 'Expectancy/trade')} (${usd(st.expUsd)})</span></div><div class="st"><b class="${cls(st.total)}">${usd(st.total)}</b><span>${T('Total P&L (net)', 'Total P&L (net)')}</span></div></div>
+    <div style="margin-top:10px"><div class="sm" style="display:flex;justify-content:space-between"><span>⏱ ${T('Pichle 1 ghante me trades', 'Trades in last hour')}: <b>${tph}</b> / ${cfg.targetTph} ${T('goal', 'goal')}</span><span class="mu">${T('zabardasti trade nahi', 'never forced')}</span></div><div class="bar" style="margin-top:4px"><i style="width:${Math.min(100, tph / cfg.targetTph * 100)}%;background:${tph >= cfg.targetTph ? 'var(--g)' : 'var(--y)'}"></i></div></div></div>
+    <div class="card"><h3>${T('Equity curve', 'Equity curve')}</h3><canvas id="eq"></canvas></div>
+    <div class="card"><h3>${T('Open positions', 'Open positions')} (${S.open.length}/${cfg.maxOpen})</h3><div id="openBox"></div></div>
+    <div class="card"><h3>${T('10-trade blocks', '10-trade blocks')}</h3>${st.blocks.length ? st.blocks.map(b => `<div class="row"><div class="f1">Block #${b.no}</div><b class="${b.hit ? 'g' : 'r'}">${b.wins}/10 ${b.hit ? '✅' : '❌'}</b><span class="${cls(b.pnl)}" style="width:80px;text-align:right">${usd(b.pnl)}</span></div>`).join('') : ''}<div class="sm mu">${T('Abhi wala block', 'Current block')}: ${st.curBlock.wins}/${st.curBlock.n} ${T('jeet', 'wins')} (${st.curBlock.n}/10 ${T('trades', 'trades')})</div></div>
+    <div class="card"><h3>${T('Hisaab (math)', 'The math')}</h3><div class="sm">${T(`TP ${cfg.tpPct}% aur SL ${cfg.slPct}%: <b>1 jeet = ${m.lossesPerWinGross.toFixed(0)} loss cover</b>. 5 me 4 jeet, 1 loss = ${4 * cfg.tpPct} − ${cfg.slPct} = <b class="g">+${m.ev45gross}%</b> (position size ke hisaab se). Fees/slippage (~0.5% round-trip) ke baad: jeet ≈ +${m.W.toFixed(1)}%, loss ≈ −${m.L.toFixed(1)}% → 1 jeet ≈ ${m.lossesPerWinNet.toFixed(1)} loss cover, 4J/1L ≈ <b class="g">+${m.ev45net.toFixed(1)}%</b>. Break-even win rate sirf ~${m.breakevenNet.toFixed(0)}% hai.`, `TP ${cfg.tpPct}% and SL ${cfg.slPct}%: <b>1 win covers ${m.lossesPerWinGross.toFixed(0)} losses</b>. 4W/1L = ${4 * cfg.tpPct} − ${cfg.slPct} = <b class="g">+${m.ev45gross}%</b> of position. After ~0.5% round-trip costs: win ≈ +${m.W.toFixed(1)}%, loss ≈ −${m.L.toFixed(1)}% → 1 win covers ≈${m.lossesPerWinNet.toFixed(1)} losses, 4W/1L ≈ <b class="g">+${m.ev45net.toFixed(1)}%</b>. Break-even win rate is only ~${m.breakevenNet.toFixed(0)}%.`)}<br><br>${T(`Size: $${S.bal.toFixed(0)} × ${cfg.riskPct}% ÷ ${cfg.slPct}% = $${(S.bal * cfg.riskPct / cfg.slPct).toFixed(0)}, par max ${cfg.maxPosPct}% cap = <b>$${E.size(S.bal, S.bal, cfg).size}</b> → ek SL loss ≈ ${usd(-E.size(S.bal, S.bal, cfg).size * cfg.slPct / 100)} (${E.size(S.bal, S.bal, cfg).actualRiskPct.toFixed(2)}% balance).`, `Size: $${S.bal.toFixed(0)} × ${cfg.riskPct}% ÷ ${cfg.slPct}% = $${(S.bal * cfg.riskPct / cfg.slPct).toFixed(0)}, capped at ${cfg.maxPosPct}% = <b>$${E.size(S.bal, S.bal, cfg).size}</b> → one SL loss ≈ ${usd(-E.size(S.bal, S.bal, cfg).size * cfg.slPct / 100)} (${E.size(S.bal, S.bal, cfg).actualRiskPct.toFixed(2)}% of balance).`)}</div></div>
+    <div class="sm mu" style="text-align:center">v${VER} • ${T('Financial advice nahi hai', 'Not financial advice')}</div>`;
+  }
+  function hCoins() { const L = uni.list || []; const ok = L.filter(u => u.pass); return `<div class="card"><h3>${T('Kya trade karta hai', 'What it trades')}</h3><div class="sm">${T(`Solana ke bade coins (SOL, JUP, BONK, WIF, POPCAT, JTO, RAY, PYTH…) + DexScreener/GeckoTerminal trending — sirf jo filters pass karein: liquidity ≥ $${D.k(cfg.minLiq)}, 24h volume ≥ $${D.k(cfg.minVol)}, pair ≥ ${cfg.minAgeH}h purana, round-trip cost ≤ ${cfg.maxRtCost}%, RugCheck/GoPlus me danger nahi. pump.fun new-born nahi.`, `Solana majors (SOL, JUP, BONK, WIF, POPCAT, JTO, RAY, PYTH…) + DexScreener/GeckoTerminal trending — only if they pass: liquidity ≥ $${D.k(cfg.minLiq)}, 24h volume ≥ $${D.k(cfg.minVol)}, pair age ≥ ${cfg.minAgeH}h, round-trip cost ≤ ${cfg.maxRtCost}%, no RugCheck/GoPlus danger. No pump.fun new-borns.`)}</div><div style="margin-top:8px;display:flex;justify-content:space-between;align-items:center"><span class="sm mu">${uni.t ? tm(uni.t) : '—'} • <b class="g">${ok.length}</b>/${L.length} pass</span><button class="sm" id="uniRef">↻ ${T('Refresh', 'Refresh')}</button></div></div>
+    <div class="card">${L.length ? L.slice().sort((a, b) => (b.pass - a.pass) || ((b.liq || 0) - (a.liq || 0))).map(u => `<div class="row"><div class="f1"><b>${esc(u.sym)}</b> <span class="mu sm">${esc(u.dex || '')}${u.src !== 'core' ? ' • ' + u.src : ''}</span><div class="sm mu">Liq $${D.k(u.liq || 0)} • Vol $${D.k(u.vol24 || 0)} • ${u.ageH ? (u.ageH > 48 ? (u.ageH / 24).toFixed(0) + 'd' : u.ageH.toFixed(0) + 'h') : '-'}${u.rt ? ' • cost ' + u.rt.toFixed(2) + '%' : ''}${u.last ? ' • RSI ' + (u.last.rsi || 0).toFixed(0) : ''}</div>${u.why.length ? `<div class="sm r">${u.why.map(w => esc(tr(w))).join(' • ')}</div>` : ''}</div><span class="pill ${u.pass ? 'ok' : 'no'}">${u.pass ? 'PASS' : 'SKIP'}</span></div>`).join('') : `<div class="mu sm">${T('Refresh dabao ya ▶ start karo', 'Press Refresh or ▶ start')}</div>`}</div>`; }
+  function hLog() { return `<div class="card"><h3>${T('Har decision ki wajah', 'Every decision & reason')}</h3>${S.log.length ? S.log.slice(0, 200).map(l => `<div class="log"><span class="t">${tm(l.t)}</span> <b class="${l.lv === 'win' || l.lv === 'sig' || l.lv === 'buy' ? 'g' : l.lv === 'loss' || l.lv === 'stop' || l.lv === 'err' ? 'r' : ''}">${esc(l.sym)}</b> ${esc(tr(l.r))}</div>`).join('') : `<div class="mu sm">${T('Abhi khali', 'Empty')}</div>`}</div>`; }
+  function hHist() { const L = S.trades.slice().reverse(); return `<div class="card"><h3>${T('Trade history', 'Trade history')} (${L.length})</h3>${L.length ? L.map(t => `<div class="row" style="display:block"><div style="display:flex;justify-content:space-between"><b>${esc(t.sym)} <span class="pill ${t.pnl > 0 ? 'ok' : 'no'}">${t.why}</span></b><b class="${cls(t.pnl)}">${usd(t.pnl)} (${pct(t.pnlPct)})</b></div><div class="sm mu">${tm(t.tIn)} → ${tm(t.tOut)} • ${t.mins.toFixed(0)} min • $${t.size} • ${E.fmt(t.entryMid)} → ${E.fmt(t.exitMid)} (${T('price', 'price')} ${pct(t.gross)})</div><div class="sm">${(t.rs || []).map(r => esc(tr(r))).join(' • ')}</div></div>`).join('') : `<div class="mu sm">${T('Abhi koi trade nahi hua', 'No trades yet')}</div>`}</div>`; }
+  let BT = { running: false, prog: '', h: 72, res: LS.get('bt', null) };
+  function hBt() { const r = BT.res; return `<div class="card"><h3>Backtest</h3><div class="sm">${T('Pichle 24–72 ghante ki 1m candles par yahi strategy chalake dekhta hai (same filters, same SL/TP, fees ke saath). Ek candle me SL aur TP dono chhu jaaye to SL maana jaata hai (imaandar/conservative).', 'Replays the last 24–72h of 1m candles with the same strategy, filters, SL/TP and costs. If SL and TP touch in the same candle, SL is assumed (conservative).')}</div><div style="display:flex;gap:8px;margin-top:10px"><select id="btH">${[24, 48, 72].map(h => `<option value="${h}" ${BT.h === h ? 'selected' : ''}>${h}h</option>`).join('')}</select><button class="pri" id="btRun" ${BT.running ? 'disabled' : ''}>${BT.running ? '…' : T('▶ Backtest chalao', '▶ Run backtest')}</button></div><div class="sm mu" style="margin-top:6px" id="btProg">${esc(BT.prog)}</div></div>${r ? btReport(r) : ''}`; }
+  function btReport(r) { const s = r.st, sf = (x, d) => x == null ? '—' : x.toFixed(d == null ? 0 : d); const ur = (r.unreal || []).reduce((a, x) => a + x.pnl, 0);
+    return `<div class="card"><h3>${T('Result', 'Result')} • ${sf(r.hours)}h • ${r.tokens.length} coins</h3><div class="sm mu">${esc(r.tokens.join(', '))} • ${r.at ? tm(r.at) : ''}</div>
+    <div class="grid" style="margin-top:8px"><div class="st"><b>${s.n}</b><span>Trades</span></div><div class="st"><b>${s.wins}/${s.n}</b><span>${T('Jeet', 'Wins')} (${sf(s.winRate)}%)</span></div><div class="st"><b class="${cls(s.total)}">${usd(s.total)}</b><span>P&L net</span></div>
+    <div class="st"><b class="g">${pct(s.avgWinPct)}</b><span>Avg win</span></div><div class="st"><b class="r">${pct(s.avgLossPct)}</b><span>Avg loss</span></div><div class="st"><b>${s.pf === Infinity || s.pf == null ? '∞' : sf(s.pf, 2)}</b><span>PF</span></div>
+    <div class="st"><b class="${cls(s.expPct)}">${pct(s.expPct)}</b><span>Expectancy</span></div><div class="st"><b>${sf(r.tph, 2)}</b><span>${T('Trades/ghanta', 'Trades/hour')} (goal ${cfg.targetTph})</span></div><div class="st"><b>${r.avgTtpMin == null ? '—' : sf(r.avgTtpMin) + 'm'}</b><span>${T('Avg time to TP', 'Avg time to TP')}</span></div></div>
+    <div class="sm" style="margin-top:8px">${T(`Signals: ${r.signals} • daily-stop se ruke: ${r.blockedDay} • slot full: ${r.skipSlots} • cost zyada: ${r.skipCost} • open (end par, unrealised): ${(r.unreal || []).length} (${usd(ur)})`, `Signals: ${r.signals} • blocked by daily stop: ${r.blockedDay} • slots full: ${r.skipSlots} • cost too high: ${r.skipCost} • still open at end (unrealised): ${(r.unreal || []).length} (${usd(ur)})`)}</div>
+    <div class="sm" style="margin-top:6px">${T(`Market check: in coins me kisi bhi random minute se +${cfg.tpPct}% ${sf(r.probe.hit60Pct, 2)}% baar hi 60 min ke andar aaya; −${cfg.slPct}% se pehle +${cfg.tpPct}% sirf ${sf(r.probe.tpFirstPct, 1)}% baar (median ${r.probe.medTtp == null ? '—' : sf(r.probe.medTtp) + ' min'}).`, `Market check: from a random minute, +${cfg.tpPct}% was reached within 60 min only ${sf(r.probe.hit60Pct, 2)}% of the time; +${cfg.tpPct}% before −${cfg.slPct}% only ${sf(r.probe.tpFirstPct, 1)}% (median ${r.probe.medTtp == null ? '—' : sf(r.probe.medTtp) + ' min'}).`)}</div>
+    <div class="warn" style="margin-top:8px">${T(`Sach: ${s.n < 20 ? 'Trades bahut kam hain, is result se koi pakka nateeja nahi nikalta. ' : ''}Bade coins me ${cfg.tpPct}% ka move minutes me bahut kam hota hai, isliye ${cfg.targetTph} trades/ghanta in filters ke saath possible nahi. Ye past data hai, future ki guarantee nahi.`, `Honest: ${s.n < 20 ? 'Too few trades to conclude anything. ' : ''}${cfg.tpPct}% moves on large caps within minutes are rare, so ${cfg.targetTph} trades/hour is not achievable with these filters. Past data, no guarantee.`)}</div>
+    ${s.blocks && s.blocks.length ? `<div class="sm">${s.blocks.map(b => `Block #${b.no}: ${b.wins}/10 ${b.hit ? '✅' : '❌'}`).join(' • ')}</div>` : ''}
+    <table style="margin-top:8px"><tr><th>Coin</th><th>${T('Kab', 'When')}</th><th>Exit</th><th>min</th><th>net</th></tr>${(r.trades || []).slice(-40).reverse().map(t => `<tr><td>${esc(t.sym)}</td><td>${tm(t.tIn)}</td><td>${t.why}</td><td>${(t.mins || 0).toFixed(0)}</td><td class="${cls(t.pnlPct)}">${pct(t.pnlPct)}</td></tr>`).join('')}</table></div>`; }
+  async function runBt() {
+    if (BT.running) return; BT.running = true; const H = +($('#btH') ? $('#btH').value : 72); BT.h = H; const P = (m) => { BT.prog = m; const e = $('#btProg'); if (e) e.textContent = m; }; D.onWait = (s) => P(BT.prog.replace(/ ⏳.*$/, '') + ' ⏳ ' + T(`GeckoTerminal limit — ${s}s ruk ke dobara`, `GeckoTerminal rate limit — retry in ${s}s`));
+    try { render(); P(T('Coins list…', 'Universe…')); await refreshUni(false); const L = uni.list.filter(u => u.pass); if (!L.length) throw new Error(T('Koi coin filters pass nahi kar raha', 'No coin passes filters'));
+      const series = []; for (let i = 0; i < L.length; i++) { const u = L[i]; const c1 = D.fill(await D.history1m(u.pair, H + 6, (n, need) => P(`${u.sym} ${i + 1}/${L.length}: ${n}/${need} ${T('candles', 'candles')} (GeckoTerminal ~15 req/min)`))); series.push({ sym: u.sym, liq: u.liq, feeSide: u.feeSide, c1 }); }
+      P(T('Calculate ho raha hai…', 'Computing…')); await new Promise(r => setTimeout(r, 30));
+      const r = E.backtest(series, Object.assign({}, cfg, { startBal: 1000 }), { fromT: Date.now() - H * 3600e3 }); const keep = { at: Date.now(), hours: r.hours, tokens: r.tokens, st: r.st, tph: r.tph, avgTtpMin: r.avgTtpMin, avgTslMin: r.avgTslMin, probe: r.probe, signals: r.signals, blockedDay: r.blockedDay, skipSlots: r.skipSlots, skipCost: r.skipCost, unreal: r.unreal, trades: r.trades.map(t => ({ sym: t.sym, tIn: t.tIn, why: t.why, mins: t.mins, pnlPct: t.pnlPct })) };
+      BT.res = keep; LS.set('bt', keep); P(T('Ho gaya ✓', 'Done ✓')); } catch (e) { P('Error: ' + e.message); }
+    BT.running = false; render();
+  }
+  const SETS = [['startBal', 'Starting paper balance ($)', 'Shuruaati paper balance ($)', 100, 1e6, 100], ['slPct', 'Stop-loss %', 'Stop-loss %', 0.5, 5, 0.1], ['tpPct', 'Take-profit % (7–10)', 'Take-profit % (7–10)', 7, 10, 0.5], ['trailAct', 'Trailing starts at +%', 'Trailing kab shuru +%', 5, 10, 0.5], ['trailGap', 'Trailing gap %', 'Trailing gap %', 0.5, 5, 0.1], ['riskPct', 'Risk per trade % (0.5–2)', 'Risk per trade % (0.5–2)', 0.5, 2, 0.1], ['maxPosPct', 'Max % of balance per trade', 'Ek trade me max % balance', 5, 50, 1], ['maxOpen', 'Max open positions', 'Max open positions', 1, 5, 1], ['lossStreakStop', 'Pause after N losses in a row', 'Lagatar N loss pe pause', 1, 5, 1], ['dayLossStop', 'Daily loss stop %', 'Daily loss stop %', 1, 10, 0.5], ['minLiq', 'Min liquidity $', 'Min liquidity $', 100000, 1e8, 50000], ['minVol', 'Min 24h volume $', 'Min 24h volume $', 100000, 1e9, 50000], ['minAgeH', 'Min pair age (h)', 'Min pair age (ghante)', 24, 1e5, 1], ['maxRtCost', 'Max round-trip cost %', 'Max round-trip cost %', 0.1, 2, 0.05], ['minRR', 'Min reward:risk', 'Min reward:risk', 2, 6, 0.1], ['rsiLow', 'RSI dip level', 'RSI dip level', 20, 50, 1], ['volMult', 'Volume confirm (× avg)', 'Volume confirm (× avg)', 1, 3, 0.1], ['defFeeSide', 'Fee/side if unknown %', 'Fee/side (agar pata na ho) %', 0, 1, 0.01], ['slipBuf', 'Slippage buffer/side %', 'Slippage buffer/side %', 0, 1, 0.01], ['targetWin10', 'Target wins per 10', '10 me target jeet', 5, 10, 1], ['targetTph', 'Trades/hour goal (display only)', 'Trades/ghanta goal (sirf dikhane ke liye)', 1, 60, 1], ['scanSec', 'Scan every (sec)', 'Scan har (sec)', 30, 600, 5]];
+  function hSet() { return `<div class="card"><h3>${T('Settings (exact values)', 'Settings (exact values)')}</h3>${SETS.map(s => `<label class="s"><span class="sm">${T(s[2], s[1])}</span><input type="number" data-k="${s[0]}" min="${s[3]}" max="${s[4]}" step="${s[5]}" value="${cfg[s[0]]}"></label>`).join('')}<label class="s"><span class="sm">${T('Trailing stop (+7% ke baad)', 'Trailing stop (after +7%)')}</span><input type="checkbox" data-k="trailOn" ${cfg.trailOn ? 'checked' : ''}></label>
+    <div style="display:flex;gap:8px;margin-top:10px"><button id="setDef">${T('Default wapas', 'Defaults')}</button><button class="dan" id="reset">${T('Balance reset', 'Reset balance')}</button></div></div>
+    <div class="card"><h3>${T('Strategy (entry signal)', 'Strategy (entry signal)')}</h3><div class="sm">${T(`1) 5m chart: price EMA50 ke upar aur EMA20 > EMA50 (uptrend). 2) 1m chart: pichhli ${cfg.pullbackBars} candles me price EMA20 tak wapas aaya aur RSI ${cfg.rsiLow} se neeche gaya. 3) Ab RSI ${cfg.rsiLow} ke upar aur badh raha, green candle EMA20 ke upar close. 4) Volume ≥ ${cfg.volMult}× average. 5) Purana resistance (12h se 2h pehle tak ka high) kam se kam ~7% upar ho ya price us se upar ho: reward:risk ≥ ${cfg.minRR}. Tabhi paper buy.`, `1) 5m: price > EMA50 and EMA20 > EMA50 (uptrend). 2) 1m: within last ${cfg.pullbackBars} candles price pulled back to EMA20 and RSI dipped below ${cfg.rsiLow}. 3) Now RSI back ≥ ${cfg.rsiLow} and rising, green candle closing above EMA20. 4) Volume ≥ ${cfg.volMult}× avg. 5) Room to older resistance (high from 12h→2h ago) gives reward:risk ≥ ${cfg.minRR}. Only then paper buy.`)}</div></div>
+    <div class="card"><h3>${T('Paise kaise lagte hain (fees)', 'Cost model')}</h3><div class="sm">${T(`Har side: pool fee (GoPlus se, na mile to ${cfg.defFeeSide}%) + price impact (size ÷ aadhi liquidity) + network ${cfg.netCostSide}% + slippage ${cfg.slipBuf}%. SL/TP price se lagte hain; net P&L me ye sab kat ke dikhta hai.`, `Per side: pool fee (from GoPlus, else ${cfg.defFeeSide}%) + price impact (size ÷ half liquidity) + network ${cfg.netCostSide}% + slippage ${cfg.slipBuf}%. SL/TP trigger on price; net P&L includes all costs.`)}</div></div>`; }
+  function render() { nav(); $('#lang').textContent = lang === 'hi' ? 'EN' : 'हिं'; const rb = $('#runBtn'); rb.textContent = S.running ? '⏸' : '▶'; rb.className = 'sm ' + (S.running ? 'dan' : 'pri');
+    const el = $('#pg-' + cur); el.innerHTML = ({ home: hHome, coins: hCoins, log: hLog, hist: hHist, bt: hBt, set: hSet })[cur]();
+    if (cur === 'home') { renderOpen(); eqChart($('#eq'), S.eq); } }
+  document.addEventListener('click', (e) => {
+    const a = e.target.closest('[data-p]'); if (a) { e.preventDefault(); go(a.dataset.p); return; }
+    const c = e.target.closest('[data-close]'); if (c) { const p = S.open.find(x => x.id === c.dataset.close); if (p && confirm(T('Ye paper position abhi bech dein?', 'Close this paper position now?'))) closePos(p, lastPx[p.pair] || p.entryMid, 'MAN'); return; }
+    if (e.target.id === 'lang') { lang = lang === 'hi' ? 'en' : 'hi'; LS.set('lang', lang); render(); }
+    if (e.target.id === 'runBtn') { S.running = !S.running; log('BOT', 'info', S.running ? R('▶ Bot shuru (paper)', '▶ Bot started (paper)') : R('⏸ Bot roka', '⏸ Bot stopped')); save(); render(); }
+    if (e.target.id === 'uniRef') { refreshUni(true).catch(err => log('SCAN', 'err', R(err.message, err.message))); }
+    if (e.target.id === 'btRun') runBt();
+    if (e.target.id === 'setDef') { cfg = Object.assign({}, E.DEF); LS.set('cfg', cfg); render(); }
+    if (e.target.id === 'reset' && confirm(T('Paper balance, trades aur history reset karein?', 'Reset paper balance, trades and history?'))) { const run = S.running; S = fresh(); S.running = run; save(); log('BOT', 'info', R(`Reset: naya paper balance $${cfg.startBal}`, `Reset: new paper balance $${cfg.startBal}`)); render(); }
+  });
+  document.addEventListener('change', (e) => { const k = e.target.dataset && e.target.dataset.k; if (!k) return; if (k === 'trailOn') cfg.trailOn = e.target.checked; else { const s = SETS.find(x => x[0] === k); let v = +e.target.value; if (!isFinite(v)) return; v = Math.min(s[4], Math.max(s[3], v)); cfg[k] = v; e.target.value = v; } LS.set('cfg', cfg); if (k === 'startBal' && !S.trades.length && !S.open.length) { S.bal = S.startBal = cfg.startBal; S.eq = [{ t: Date.now(), v: cfg.startBal }]; save(); } });
+  window.V45APP = { get S() { return S; }, get cfg() { return cfg; }, set cfg(v) { cfg = v; }, openPos, closePos, onPrice, render, go, runBt, refreshUni, get uni() { return uni; }, set uni(v) { uni = v; }, BT };
+  render(); priceLoop(); scanLoop();
+})();
+</script></body></html>

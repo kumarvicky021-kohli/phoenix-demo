@@ -1,0 +1,436 @@
+<!doctype html>
+<html lang="hi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#07090d">
+<meta name="robots" content="noindex">
+<title>Night Desk · 6-Agent Paper Trading (DEMO)</title>
+<style>
+:root{--bg:#07090d;--card:#0f131a;--line:#1c2330;--txt:#e9edf3;--mut:#7c8696;--up:#3ee08f;--dn:#ff5c7a;--warn:#ffb547;--acc:#7aa2ff;--glow:#3ee08f}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;background:var(--bg);color:var(--txt);font-family:Inter,system-ui,-apple-system,"Segoe UI","Noto Sans Devanagari",Roboto,sans-serif;font-size:14px}
+a{color:var(--acc);text-decoration:none}
+button{font:inherit;color:inherit;border:0;cursor:pointer}
+.wrap{max-width:560px;margin:0 auto;padding:10px 12px 40px}
+.mono{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+.up{color:var(--up)}.dn{color:var(--dn)}.mut{color:var(--mut)}.warn{color:var(--warn)}
+.card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:12px;margin:10px 0}
+.card h3{margin:0 0 8px;font-size:13px;letter-spacing:.04em;color:var(--mut);text-transform:uppercase;font-weight:600;display:flex;justify-content:space-between;align-items:center}
+.demo{background:#3a2a00;color:#ffd27a;border:1px solid #6b4e00;border-radius:999px;padding:3px 9px;font-size:11px;font-weight:700}
+.top{display:flex;justify-content:space-between;align-items:center;gap:8px}
+.brand{font-weight:800;font-size:17px}
+.timer{font-size:13px;color:var(--mut)}
+.bal{font-size:38px;font-weight:800;letter-spacing:-.02em;margin:6px 0 0}
+.sub{font-size:13px}
+.row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.btn{padding:11px 16px;border-radius:12px;font-weight:700;background:#1a2230}
+.btn.go{background:var(--up);color:#04130b}.btn.stop{background:var(--dn);color:#fff}
+.btn.sm{padding:7px 10px;font-size:12px;border-radius:9px}
+input.num{width:110px;background:#0b0f15;border:1px solid var(--line);border-radius:9px;padding:8px;color:var(--txt)}
+.pipe{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.ag{border:1px solid var(--line);border-radius:12px;padding:9px 8px;background:#0b0f15;min-height:84px;transition:all .25s}
+.ag .n{font-size:11px;color:var(--mut)}.ag .t{font-weight:800;font-size:13px;margin:2px 0}.ag .s{font-size:11px;color:var(--mut);line-height:1.3;word-break:break-word}
+.ag .dot{display:inline-block;width:8px;height:8px;border-radius:50%;background:#334;margin-right:5px;vertical-align:middle}
+.ag.work{border-color:var(--glow);box-shadow:0 0 14px rgba(62,224,143,.35)}.ag.work .dot{background:var(--glow);animation:bl 1s infinite}
+.ag.ok .dot{background:var(--up)}.ag.fail{border-color:#5a2130}.ag.fail .dot{background:var(--dn)}
+@keyframes bl{50%{opacity:.25}}
+canvas{width:100%;display:block}
+.kv{display:grid;grid-template-columns:auto 1fr;gap:4px 10px;font-size:13px}.kv b{font-weight:600}.kv span:nth-child(odd){color:var(--mut)}
+.log{background:#030507;border:1px solid var(--line);border-radius:10px;padding:8px;height:260px;overflow:auto;font-size:11.5px;line-height:1.45;white-space:pre-wrap;word-break:break-word}
+.log .b{color:var(--up)}.log .s{color:var(--acc)}.log .r{color:var(--mut)}.log .x{color:var(--dn)}.log .w{color:var(--warn)}
+.pos{border-top:1px solid var(--line);padding:8px 0;font-size:13px}.pos:first-child{border-top:0}
+.pill{font-size:11px;padding:2px 7px;border-radius:999px;background:#1a2230;color:var(--mut)}
+.grid2{display:grid;grid-template-columns:110px 1fr;gap:12px;align-items:center}
+.pending{border-color:#2d4a8a;background:#0c1426}
+table{width:100%;border-collapse:collapse;font-size:12px}td,th{padding:5px 3px;border-top:1px solid var(--line);text-align:left}th{color:var(--mut);font-weight:600}
+.foot{font-size:11.5px;color:var(--mut);line-height:1.5}
+details summary{cursor:pointer;color:var(--mut);font-size:12px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="top">
+    <div class="brand">🌙 Night Desk <span class="mut" style="font-weight:500;font-size:12px">6-Agent</span></div>
+    <span class="demo">DEMO PAISA · असली पैसा नहीं</span>
+  </div>
+  <div class="card" style="margin-top:8px">
+    <div class="top"><span class="mut sub">Namaste Vivaan जी 🙏 · Total Balance (demo)</span><span class="timer mono" id="timer">⏱ 00:00:00</span></div>
+    <div class="bal mono" id="bal">₹5,000</div>
+    <div class="sub mono" id="pnl">P&amp;L ₹0 (0.00%)</div>
+    <div class="sub mut" id="cashline" style="margin-top:4px">Cash ₹— · Open ₹—</div>
+    <div class="sub mut" id="fxline" style="margin-top:2px">USD→INR: loading…</div>
+    <div class="row" style="margin-top:10px">
+      <button class="btn go" id="startBtn">▶ Start</button>
+      <span class="mut sub" id="status">Ruka hua hai (stopped)</span>
+    </div>
+  </div>
+
+  <div class="card">
+    <h3>6 Agents Pipeline <span class="pill" id="cycle">cycle 0</span></h3>
+    <div class="pipe" id="pipe"></div>
+  </div>
+
+  <div class="card pending hidden" id="pendingCard" style="display:none">
+    <h3>Agla Trade · pehle se calculate kiya <span class="pill">₹ INR</span></h3>
+    <div id="pending"></div>
+  </div>
+
+  <div class="card">
+    <h3>Open Positions (khule trade) <span class="pill" id="opencnt">0</span></h3>
+    <div id="positions" class="mut sub">Abhi koi trade khula nahi hai.</div>
+  </div>
+
+  <div class="card">
+    <h3>Equity Curve <span class="pill">log scale · asli</span></h3>
+    <canvas id="eq" height="170"></canvas>
+    <div class="mut" style="font-size:11px;margin-top:4px">Har 15 sec ka asli mark-to-market (fees ke baad). Kuch bhi edit nahi kiya.</div>
+  </div>
+
+  <div class="card">
+    <h3>Jeet ka hisaab (Win rate)</h3>
+    <div class="grid2">
+      <canvas id="donut" width="220" height="220" style="width:110px;height:110px"></canvas>
+      <div class="kv mono" id="stats"></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h3>Trace Last Trade (aakhri trade)</h3>
+    <div id="trace" class="mut sub">Abhi tak koi trade band nahi hua.</div>
+  </div>
+
+  <div class="card">
+    <h3>decisions.log <button class="btn sm" id="clearLog">clear</button></h3>
+    <div class="log mono" id="log"></div>
+  </div>
+
+  <div class="card">
+    <h3>Band hue trades</h3>
+    <div id="closed" class="mut sub">—</div>
+  </div>
+
+  <div class="card">
+    <h3>Settings</h3>
+    <div class="row sub">Shuru ka demo balance ₹ <input class="num" id="startBalIn" type="number" min="100" step="100" value="5000"> <button class="btn sm" id="resetBtn">Reset (naya session)</button></div>
+    <div class="foot" style="margin-top:8px" id="rules"></div>
+  </div>
+
+  <div class="foot">
+    ⚠️ Yeh sirf <b>paper trading</b> hai: koi wallet connect nahi hota, koi private key nahi, koi asli order nahi jaata. Coins, prices aur safety data asli hain (DexScreener, GeckoTerminal, RugCheck se, live). Fills asli live price par 1% fee+slippage ke saath simulate hote hain. Meme coins bahut risky hain. Asli trading me nateeje kharab bhi ho sakte hain. Tab band hone par bot nahi chalta.
+    <br><a href="../">← Phoenix home</a>
+  </div>
+</div>
+
+<script>
+'use strict';
+// ====================== CONFIG ======================
+const CFG = {
+  perCoinPct: 10,        // max 10% of equity per coin
+  maxOpen: 4,
+  tpPct: 25,             // take profit +25%
+  slPct: 12,             // stop loss -12%
+  maxHoldMin: 45,        // time stop
+  costPct: 1.0,          // fee + slippage per side
+  minLiqUsd: 15000,
+  minVol24Usd: 50000,
+  minVol1hUsd: 5000,
+  minTxns1h: 60,
+  minAgeMin: 60,
+  maxFdvUsd: 150e6,
+  maxH1Pct: 150,
+  minH1Pct: -5,
+  minM5Pct: -3,
+  minBuyRatio: 1.05,
+  minLpLockedPct: 50,
+  maxRugScore: 50,
+  priceEveryMs: 15000,
+  scanEveryMs: 60000,
+  cooldownMin: 120,
+};
+const KEY = 'nightdesk.v1';
+const STABLE = new Set(['SOL','WSOL','USDC','USDT','USD1','PYUSD','JUP','JITOSOL','MSOL','BSOL','JLP']);
+// ====================== STATE ======================
+function fresh(startInr){return {v:1,startInr,cashInr:startInr,positions:[],closed:[],log:[],equity:[[Date.now(),startInr]],running:false,sessionMs:0,lastStart:0,cooldown:{},fx:{rate:null,ts:0,src:''},cycle:0,best:null,pendingTs:0}}
+let S;
+try{S=JSON.parse(localStorage.getItem(KEY))}catch(e){S=null}
+if(!S||S.v!==1)S=fresh(5000);
+const save=()=>{try{S.savedAt=Date.now();localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}};
+const $=id=>document.getElementById(id);
+
+// ====================== FORMAT ======================
+const inr=(v,d)=>{if(v==null||!isFinite(v))return '₹—';const a=Math.abs(v);const s=v<0?'-':'';
+  if(d==null)d=a>=100?0:2;return s+'₹'+a.toLocaleString('en-IN',{minimumFractionDigits:d,maximumFractionDigits:d})};
+const inrPrice=v=>{if(!isFinite(v)||v<=0)return '₹—';if(v>=1)return '₹'+v.toLocaleString('en-IN',{maximumFractionDigits:4});
+  const p=v.toPrecision(4);return '₹'+(Number(p)<1e-6?Number(p).toExponential(3):Number(p).toFixed(Math.min(12,Math.max(2,-Math.floor(Math.log10(v))+3))))};
+const pct=(v,d=2)=>(v>=0?'+':'')+v.toFixed(d)+'%';
+const usdK=v=>v>=1e6?'$'+(v/1e6).toFixed(2)+'M':v>=1e3?'$'+(v/1e3).toFixed(1)+'k':'$'+Math.round(v);
+const hhmm=t=>new Date(t).toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit',second:'2-digit',hour12:false,timeZone:'Asia/Kolkata'});
+const short=a=>a.slice(0,4)+'…'+a.slice(-4);
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const dur=ms=>{const s=Math.floor(ms/1000);return [Math.floor(s/3600),Math.floor(s/60)%60,s%60].map(x=>String(x).padStart(2,'0')).join(':')};
+const links=(p)=>`<a target="_blank" rel="noopener" href="https://dexscreener.com/solana/${p.pair}">DexScreener</a> · <a target="_blank" rel="noopener" href="https://solscan.io/token/${p.mint}">Solscan</a> <span class="mut mono">${short(p.mint)}</span>`;
+
+// ====================== LOG ======================
+function log(cls,msg){S.log.push([Date.now(),cls,msg]);if(S.log.length>400)S.log.splice(0,S.log.length-400);renderLog()}
+function renderLog(){const el=$('log');const atBottom=el.scrollHeight-el.scrollTop-el.clientHeight<40;
+  el.innerHTML=S.log.slice(-250).map(([t,c,m])=>`<span class="r">[${hhmm(t)}]</span> <span class="${c}">${esc(m)}</span>`).join('\n');
+  if(atBottom)el.scrollTop=el.scrollHeight}
+
+// ====================== AGENTS UI ======================
+const AG=[['scan','1 · Scanner','स्कैनर'],['rug','2 · Rug Check','सुरक्षा जांच'],['size','3 · Sizer','कितना लगाना'],['exec','4 · Executor','पेपर ऑर्डर'],['logr','5 · Logger','हिसाब'],['eq','6 · Equity','बैलेंस ग्राफ']];
+const agState={};AG.forEach(a=>agState[a[0]]={st:'',txt:'idle'});
+function ag(k,st,txt){agState[k]={st,txt};renderPipe()}
+function renderPipe(){$('pipe').innerHTML=AG.map(([k,n,h])=>`<div class="ag ${agState[k].st}"><div class="n">${n}</div><div class="t"><span class="dot"></span>${h}</div><div class="s">${esc(agState[k].txt)}</div></div>`).join('')}
+
+// ====================== NET ======================
+async function getJ(url,ms=12000){const c=new AbortController();const t=setTimeout(()=>c.abort(),ms);
+  try{const r=await fetch(url,{signal:c.signal});if(!r.ok)throw new Error('HTTP '+r.status);return await r.json()}finally{clearTimeout(t)}}
+async function loadFx(force){
+  if(!force&&S.fx.rate&&Date.now()-S.fx.ts<30*60e3)return;
+  try{const j=await getJ('https://open.er-api.com/v6/latest/USD');const r=j&&j.rates&&j.rates.INR;if(r>50&&r<200){S.fx={rate:r,ts:Date.now(),src:'open.er-api.com'};}}
+  catch(e){try{const j=await getJ('https://api.coinbase.com/v2/exchange-rates?currency=USD');const r=Number(j.data.rates.INR);if(r>50&&r<200)S.fx={rate:r,ts:Date.now(),src:'coinbase'}}catch(e2){log('w','USD-INR rate nahi mila: '+e2.message)}}
+  renderTop();save()}
+const fx=()=>S.fx.rate;
+
+// DexScreener batch: up to 30 token addresses
+async function dsTokens(mints){const out={};for(let i=0;i<mints.length;i+=30){const chunk=mints.slice(i,i+30);
+  try{const arr=await getJ('https://api.dexscreener.com/tokens/v1/solana/'+chunk.join(','));
+    for(const p of arr||[]){if(p.chainId!=='solana')continue;const m=p.baseToken&&p.baseToken.address;if(!m||!chunk.includes(m))continue;
+      const liq=(p.liquidity&&p.liquidity.usd)||0;if(!out[m]||liq>((out[m].liquidity&&out[m].liquidity.usd)||0))out[m]=p}}
+  catch(e){log('w','DexScreener error: '+e.message)}}
+  return out}
+
+async function gatherCandidates(){
+  const set=new Set();const add=a=>{if(a&&/^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(a))set.add(a)};
+  const srcs=[
+    ['https://api.dexscreener.com/token-boosts/latest/v1',j=>j.forEach(x=>x.chainId==='solana'&&add(x.tokenAddress))],
+    ['https://api.dexscreener.com/token-boosts/top/v1',j=>j.forEach(x=>x.chainId==='solana'&&add(x.tokenAddress))],
+    ['https://api.dexscreener.com/token-profiles/latest/v1',j=>j.forEach(x=>x.chainId==='solana'&&add(x.tokenAddress))],
+    ['https://api.geckoterminal.com/api/v2/networks/solana/trending_pools?duration=1h',j=>(j.data||[]).forEach(x=>add(((x.relationships||{}).base_token||{}).data?.id?.replace('solana_','')))],
+  ];
+  const res=await Promise.allSettled(srcs.map(([u,f])=>getJ(u).then(f)));
+  const ok=res.filter(r=>r.status==='fulfilled').length;
+  return {mints:[...set].slice(0,90),sourcesOk:ok}}
+
+// ====================== RUG CHECK ======================
+const rugCache={};
+async function rugCheck(mint){
+  const c=rugCache[mint];if(c&&Date.now()-c.ts<30*60e3)return c.r;
+  let r;try{const j=await getJ('https://api.rugcheck.xyz/v1/tokens/'+mint+'/report/summary',10000);
+    const risks=(j.risks||[]);const danger=risks.filter(x=>x.level==='danger');
+    const reasons=[];
+    for(const x of risks){const n=(x.name||'').toLowerCase();
+      if(n.includes('freeze authority'))reasons.push('Freeze authority ON (honeypot risk)');
+      else if(n.includes('mint authority'))reasons.push('Mint authority ON (naye token ban sakte)');}
+    for(const x of danger)if(!/freeze|mint authority/i.test(x.name))reasons.push(x.name+(x.value?' '+x.value:''));
+    const lp=Number(j.lpLockedPct);if(isFinite(lp)&&lp<CFG.minLpLockedPct)reasons.push(`LP sirf ${lp.toFixed(0)}% locked`);
+    if(Number(j.score_normalised)>CFG.maxRugScore)reasons.push('RugCheck score '+j.score_normalised+'/100 (zyada risk)');
+    r={ok:reasons.length===0,reasons:[...new Set(reasons)],score:j.score_normalised,lp,warns:risks.filter(x=>x.level!=='danger').map(x=>x.name)};
+  }catch(e){r={ok:false,reasons:['RugCheck data nahi mila ('+e.message+') — safety ke liye skip'],score:null,lp:null,warns:[]}}
+  rugCache[mint]={ts:Date.now(),r};return r}
+
+// ====================== SCANNER FILTER ======================
+function filterPair(p){
+  const sym=(p.baseToken.symbol||'').toUpperCase();
+  const liq=p.liquidity?.usd||0,v24=p.volume?.h24||0,v1=p.volume?.h1||0,h1=p.priceChange?.h1??0,m5=p.priceChange?.m5??0;
+  const tx=p.txns?.h1||{buys:0,sells:0};const ageMin=p.pairCreatedAt?(Date.now()-p.pairCreatedAt)/60e3:0;const fdv=p.fdv||p.marketCap||0;
+  const price=Number(p.priceUsd);
+  if(STABLE.has(sym))return 'major/stable: skip';
+  if(!(price>0))return 'price: nahi mila';
+  if(liq<CFG.minLiqUsd)return `liquidity kam: ${usdK(liq)} < ${usdK(CFG.minLiqUsd)}`;
+  if(v24<CFG.minVol24Usd)return `24h volume kam: ${usdK(v24)} kam`;
+  if(v1<CFG.minVol1hUsd)return `1h volume kam: ${usdK(v1)} kam`;
+  if(ageMin<CFG.minAgeMin)return `bahut naya: (${Math.round(ageMin)} min)`;
+  if(fdv>CFG.maxFdvUsd)return `mcap bada: ${usdK(fdv)} bahut bada`;
+  if(tx.buys+tx.sells<CFG.minTxns1h)return `kam txns: 1h me ${tx.buys+tx.sells} txns`;
+  if(h1>CFG.maxH1Pct)return `pump ho chuka: 1h ${pct(h1,0)} — late entry`;
+  if(h1<CFG.minH1Pct)return `trend neeche: 1h ${pct(h1,1)}`;
+  if(m5<CFG.minM5Pct)return `5m gir raha: ${pct(m5,1)}`;
+  const br=tx.sells?tx.buys/tx.sells:tx.buys;if(br<CFG.minBuyRatio)return `sellers zyada: buy/sell ${br.toFixed(2)}`;
+  return null}
+function scorePair(p){const h1=p.priceChange?.h1||0,m5=p.priceChange?.m5||0,tx=p.txns?.h1||{buys:0,sells:1};
+  const br=tx.sells?tx.buys/tx.sells:2;return Math.min(h1,60)*0.6+Math.min(m5,15)*1.5+Math.log10((p.volume?.h1||1))*6+Math.min(br,3)*10+Math.log10(p.liquidity?.usd||1)*4}
+
+// ====================== EQUITY ======================
+function openValueInr(){return S.positions.reduce((s,p)=>s+p.qty*(p.lastUsd||p.entryUsd)*fx()*(1-CFG.costPct/100),0)}
+function equityInr(){return S.cashInr+(fx()?openValueInr():S.positions.reduce((s,p)=>s+p.costInr,0))}
+function pushEquity(){const e=equityInr();S.equity.push([Date.now(),e]);if(S.equity.length>3000)S.equity=S.equity.filter((_,i)=>i%2===0||i>S.equity.length-200);ag('eq','ok',`${inr(e)} · ${S.equity.length} points`)}
+
+// ====================== CYCLES ======================
+let busyScan=false,busyPx=false;
+async function scanCycle(){
+  if(busyScan||!S.running)return;busyScan=true;S.cycle++;
+  try{
+    await loadFx();if(!fx()){log('w','FX rate nahi hai, trade skip');return}
+    if(S.positions.length>=CFG.maxOpen){ag('scan','ok',`Max ${CFG.maxOpen} trade khule, scan ruka`);return}
+    ag('scan','work','Live coins la raha hai…');
+    const {mints,sourcesOk}=await gatherCandidates();
+    const pairs=await dsTokens(mints);const list=Object.values(pairs);
+    const rej={};const pass=[];
+    for(const p of list){const why=filterPair(p);if(why){const k=why.split(':')[0];rej[k]=(rej[k]||0)+1}else pass.push(p)}
+    const held=new Set(S.positions.map(x=>x.mint));
+    const fresh=pass.filter(p=>!held.has(p.baseToken.address)&&!(S.cooldown[p.baseToken.address]>Date.now())).sort((a,b)=>scorePair(b)-scorePair(a));
+    const topRej=Object.entries(rej).sort((a,b)=>b[1]-a[1]).slice(0,3).map(([k,v])=>`${k}:${v}`).join(', ');
+    ag('scan','ok',`${list.length} scan · ${pass.length} pass · ${list.length-pass.length} reject`);
+    log('s',`SCAN #${S.cycle}: ${list.length} asli Solana coins (${sourcesOk}/4 sources) → ${pass.length} pass, ${list.length-pass.length} reject [${topRej}]`);
+    if(!fresh.length){ag('rug','','koi candidate nahi');log('r','Koi naya coin filter pass nahi hua — WAIT');return}
+    // rug check top 4
+    ag('rug','work','RugCheck chal raha…');let pick=null,rc=null;
+    for(const p of fresh.slice(0,4)){const r=await rugCheck(p.baseToken.address);
+      if(r.ok){pick=p;rc=r;log('b',`RUGCHECK PASS ${p.baseToken.symbol}: score ${r.score}/100, LP lock ${isFinite(r.lp)?r.lp.toFixed(0)+'%':'?'}${r.warns.length?' · warn: '+r.warns.join(', '):''}`);break}
+      log('x',`RUGCHECK FAIL ${p.baseToken.symbol} (${short(p.baseToken.address)}): ${r.reasons.join('; ')}`);
+      S.cooldown[p.baseToken.address]=Date.now()+30*60e3}
+    if(!pick){ag('rug','fail','Top coins risky nikle — skip');return}
+    ag('rug','ok',`${pick.baseToken.symbol} safe lagta hai`);
+    // sizer
+    ag('size','work','Size calculate…');
+    const eq=equityInr();const sizeInr=Math.floor(Math.min(eq*CFG.perCoinPct/100,S.cashInr));
+    if(sizeInr<50){ag('size','fail','Cash kam hai');log('w','Cash kam hai, trade skip');return}
+    const pxUsd=Number(pick.priceUsd);const entryUsd=pxUsd*(1+CFG.costPct/100);
+    const tpUsd=entryUsd*(1+CFG.tpPct/100),slUsd=entryUsd*(1-CFG.slPct/100);
+    const qty=sizeInr/(entryUsd*fx());
+    const profitAtTp=qty*tpUsd*fx()*(1-CFG.costPct/100)-sizeInr,lossAtSl=qty*slUsd*fx()*(1-CFG.costPct/100)-sizeInr;
+    const plan={mint:pick.baseToken.address,pair:pick.pairAddress,sym:pick.baseToken.symbol,name:pick.baseToken.name,dex:pick.dexId,
+      sizeInr,entryUsd,tpUsd,slUsd,qty,profitAtTp,lossAtSl,liq:pick.liquidity.usd,h1:pick.priceChange.h1,m5:pick.priceChange.m5,
+      tx:pick.txns.h1,v1:pick.volume.h1,
+      reason:`1h ${pct(pick.priceChange.h1,1)}, 5m ${pct(pick.priceChange.m5,1)}, buys ${pick.txns.h1.buys}/sells ${pick.txns.h1.sells}, liq ${usdK(pick.liquidity.usd)}, 1h vol ${usdK(pick.volume.h1)}, RugCheck ${rc.score}/100`};
+    ag('size','ok',`${inr(sizeInr)} (${(sizeInr/eq*100).toFixed(1)}% equity)`);
+    showPending(plan);
+    log('s',`PLAN ${plan.sym}: lagana ${inr(sizeInr)} · Entry ${inrPrice(entryUsd*fx())} · TP ${inrPrice(tpUsd*fx())} (+${CFG.tpPct}% → ${inr(profitAtTp,2)}) · SL ${inrPrice(slUsd*fx())} (-${CFG.slPct}% → ${inr(lossAtSl,2)})`);
+    await new Promise(r=>setTimeout(r,4000));
+    if(!S.running){hidePending();log('r','Stop dabaya — plan cancel');return}
+    // executor: re-fetch live price for fill
+    ag('exec','work','Live price par paper fill…');
+    const live=(await dsTokens([plan.mint]))[plan.mint];const livePx=live?Number(live.priceUsd):NaN;
+    if(!(livePx>0)){ag('exec','fail','Price nahi mila');log('w','Fill ke time price nahi mila — skip');hidePending();return}
+    const drift=(livePx/pxUsd-1)*100;
+    if(drift>3){ag('exec','fail',`Price ${pct(drift,1)} bhaag gaya`);log('w',`SKIP ${plan.sym}: plan ke baad price ${pct(drift,1)} upar, chase nahi karenge`);hidePending();return}
+    const fillUsd=livePx*(1+CFG.costPct/100);const q=sizeInr/(fillUsd*fx());
+    const pos={id:Date.now(),mint:plan.mint,pair:plan.pair,sym:plan.sym,name:plan.name,dex:plan.dex,qty:q,costInr:sizeInr,fxAtEntry:fx(),
+      entryUsd:fillUsd,rawEntryUsd:livePx,tpUsd:fillUsd*(1+CFG.tpPct/100),slUsd:fillUsd*(1-CFG.slPct/100),lastUsd:livePx,peakUsd:livePx,
+      openTs:Date.now(),reason:plan.reason};
+    S.cashInr-=sizeInr;S.positions.push(pos);hidePending();
+    ag('exec','ok',`BUY ${pos.sym} @ ${inrPrice(fillUsd*fx())}`);
+    log('b',`BUY ${pos.sym} ${inr(sizeInr)} @ ${inrPrice(fillUsd*fx())} (live $${livePx.toPrecision(5)} +${CFG.costPct}% cost) · reason: ${plan.reason}`);
+    ag('logr','ok',`BUY ${pos.sym} likha`);pushEquity();save();render();
+  }catch(e){log('x','Scan error: '+e.message);ag('scan','fail','error: '+e.message)}
+  finally{busyScan=false;save()}}
+
+async function priceCycle(){
+  if(busyPx||!S.running)return;busyPx=true;
+  try{
+    if(S.positions.length){
+      const px=await dsTokens(S.positions.map(p=>p.mint));
+      for(const p of [...S.positions]){const d=px[p.mint];if(!d){continue}const u=Number(d.priceUsd);if(!(u>0))continue;
+        p.lastUsd=u;p.peakUsd=Math.max(p.peakUsd,u);
+        const exitUsd=u*(1-CFG.costPct/100);const held=(Date.now()-p.openTs)/60e3;
+        let trig=null;
+        if(u>=p.tpUsd)trig=['TP','Take-profit hit (+'+CFG.tpPct+'% target)'];
+        else if(u<=p.slUsd)trig=['SL','Stop-loss hit (-'+CFG.slPct+'%)'];
+        else if(held>=CFG.maxHoldMin)trig=['TIME',`${CFG.maxHoldMin} min ho gaye, time-stop`];
+        else if((d.liquidity?.usd||0)<CFG.minLiqUsd*0.5)trig=['LIQ','Liquidity aadhi se kam — bahar nikle'];
+        if(trig)closePos(p,u,exitUsd,trig)}
+    }
+    pushEquity();render();save()
+  }catch(e){log('x','Price error: '+e.message)}finally{busyPx=false}}
+
+function closePos(p,u,exitUsd,trig){
+  const proceeds=p.qty*exitUsd*fx();const pnl=proceeds-p.costInr;const pc=pnl/p.costInr*100;
+  S.cashInr+=proceeds;S.positions=S.positions.filter(x=>x.id!==p.id);
+  const c={...p,closeTs:Date.now(),exitUsd,rawExitUsd:u,fxAtExit:fx(),proceedsInr:proceeds,pnlInr:pnl,pnlPct:pc,trigger:trig[0],trigReason:trig[1]};
+  S.closed.push(c);S.cooldown[p.mint]=Date.now()+CFG.cooldownMin*60e3;
+  ag('exec',pnl>=0?'ok':'fail',`SELL ${p.sym} ${pct(pc,1)}`);
+  log(pnl>=0?'b':'x',`SELL ${p.sym} [${trig[0]}] @ ${inrPrice(exitUsd*fx())} → ${pnl>=0?'+':''}${inr(pnl,2)} (${pct(pc,1)}) · ${trig[1]}${trig[0]==='SL'&&u<p.slUsd*0.98?' · note: price SL se neeche gap hua, asli fill price par':''}`);
+  ag('logr','ok',`SELL ${p.sym} likha`)}
+
+// ====================== RENDER ======================
+function showPending(pl){const el=$('pendingCard');el.style.display='block';const r=fx();
+  $('pending').innerHTML=`<div style="font-weight:800;font-size:16px">${esc(pl.sym)} <span class="mut" style="font-size:12px;font-weight:400">${esc(pl.name||'')} · ${esc(pl.dex)}</span></div>
+  <div class="kv mono" style="margin-top:6px"><span>Lagayenge</span><b>${inr(pl.sizeInr)} (max ${CFG.perCoinPct}%)</b><span>Entry</span><b>${inrPrice(pl.entryUsd*r)}</b>
+  <span>Take Profit</span><b class="up">${inrPrice(pl.tpUsd*r)} (+${CFG.tpPct}%) → ${inr(pl.profitAtTp,2)}</b>
+  <span>Stop Loss</span><b class="dn">${inrPrice(pl.slUsd*r)} (-${CFG.slPct}%) → ${inr(pl.lossAtSl,2)}</b>
+  <span>Kyun</span><span style="color:var(--txt)">${esc(pl.reason)}</span></div><div style="margin-top:6px;font-size:12px">${links(pl)}</div>
+  <div class="mut" style="font-size:11px;margin-top:4px">P&amp;L me ${CFG.costPct}% entry + ${CFG.costPct}% exit fee/slippage shamil hai. 4 sec me live price par fill…</div>`}
+function hidePending(){$('pendingCard').style.display='none'}
+
+function renderTop(){const e=equityInr();const pnl=e-S.startInr;
+  $('bal').textContent=inr(e);$('bal').className='bal mono '+(pnl>0.005?'up':pnl<-0.005?'dn':'');
+  $('pnl').innerHTML=`P&amp;L <span class="${pnl>=0?'up':'dn'}">${pnl>=0?'+':''}${inr(pnl,2)} (${pct(pnl/S.startInr*100)})</span> · shuru ${inr(S.startInr)}`;
+  $('cashline').textContent=`Cash ${inr(S.cashInr,2)} · Open trades ${fx()?inr(openValueInr(),2):'₹—'}`;
+  $('fxline').textContent=S.fx.rate?`USD→INR ${S.fx.rate.toFixed(2)} (${S.fx.src}, ${hhmm(S.fx.ts)} IST)`:'USD→INR: loading…';
+  $('startBtn').textContent=S.running?'■ Stop':'▶ Start';$('startBtn').className='btn '+(S.running?'stop':'go');
+  $('status').textContent=S.running?'Chal raha hai · har 60s scan, har 15s price':'Ruka hua hai (stopped)';
+  $('cycle').textContent='cycle '+S.cycle;
+  const ms=S.sessionMs+(S.running&&S.lastStart?Date.now()-S.lastStart:0);$('timer').textContent='⏱ '+dur(ms)}
+
+function renderPositions(){$('opencnt').textContent=S.positions.length;const r=fx();
+  if(!S.positions.length){$('positions').innerHTML='<span class="mut">Abhi koi trade khula nahi hai.</span>';return}
+  $('positions').innerHTML=S.positions.map(p=>{const val=p.qty*p.lastUsd*(r||p.fxAtEntry)*(1-CFG.costPct/100);const pnl=val-p.costInr;const pc=pnl/p.costInr*100;
+    return `<div class="pos"><div class="top"><b>${esc(p.sym)}</b><span class="mono ${pnl>=0?'up':'dn'}">${pnl>=0?'+':''}${inr(pnl,2)} (${pct(pc,1)})</span></div>
+    <div class="mono mut" style="font-size:12px">Lagaya ${inr(p.costInr)} · Entry ${inrPrice(p.entryUsd*r)} · Ab ${inrPrice(p.lastUsd*r)}<br>TP <span class="up">${inrPrice(p.tpUsd*r)}</span> · SL <span class="dn">${inrPrice(p.slUsd*r)}</span> · ${Math.floor((Date.now()-p.openTs)/60e3)}/${CFG.maxHoldMin} min</div>
+    <div style="font-size:12px">${links(p)}</div></div>`}).join('')}
+
+function renderStats(){const c=S.closed;const w=c.filter(x=>x.pnlInr>0).length,l=c.length-w;const wr=c.length?w/c.length*100:null;
+  const best=c.length?c.reduce((a,b)=>b.pnlPct>a.pnlPct?b:a):null,worst=c.length?c.reduce((a,b)=>b.pnlPct<a.pnlPct?b:a):null;
+  const realized=c.reduce((s,x)=>s+x.pnlInr,0);const fees=c.reduce((s,x)=>s+x.costInr*CFG.costPct/100+x.proceedsInr*CFG.costPct/(100-CFG.costPct),0);
+  $('stats').innerHTML=`<span>Win rate</span><b>${wr==null?'—':wr.toFixed(1)+'%'}</b><span>Jeet / Haar</span><b><span class="up">${w}</span> / <span class="dn">${l}</span> (total ${c.length})</b>
+  <span>Best trade</span><b class="up">${best?esc(best.sym)+' '+pct(best.pnlPct,1)+' ('+inr(best.pnlInr,2)+')':'—'}</b>
+  <span>Worst trade</span><b class="dn">${worst?esc(worst.sym)+' '+pct(worst.pnlPct,1)+' ('+inr(worst.pnlInr,2)+')':'—'}</b>
+  <span>Realized P&amp;L</span><b class="${realized>=0?'up':'dn'}">${realized>=0?'+':''}${inr(realized,2)}</b><span>Fees (approx)</span><b>${inr(fees,2)}</b>`;
+  const cv=$('donut'),x=cv.getContext('2d');x.clearRect(0,0,220,220);x.lineWidth=26;
+  x.beginPath();x.strokeStyle='#1c2330';x.arc(110,110,80,0,Math.PI*2);x.stroke();
+  if(c.length){const a=w/c.length*Math.PI*2;x.beginPath();x.strokeStyle='#3ee08f';x.arc(110,110,80,-Math.PI/2,-Math.PI/2+a);x.stroke();
+    if(l){x.beginPath();x.strokeStyle='#ff5c7a';x.arc(110,110,80,-Math.PI/2+a,Math.PI*1.5);x.stroke()}}
+  x.fillStyle='#e9edf3';x.font='bold 36px system-ui';x.textAlign='center';x.textBaseline='middle';x.fillText(wr==null?'—':Math.round(wr)+'%',110,104);
+  x.font='18px system-ui';x.fillStyle='#7c8696';x.fillText(`${w}W / ${l}L`,110,140)}
+
+function renderTrace(){const t=S.closed[S.closed.length-1];if(!t){$('trace').innerHTML='<span class="mut">Abhi tak koi trade band nahi hua.</span>';return}
+  $('trace').innerHTML=`<div class="top"><b style="font-size:15px">${esc(t.sym)}</b><span class="mono ${t.pnlInr>=0?'up':'dn'}">${t.pnlInr>=0?'+':''}${inr(t.pnlInr,2)} (${pct(t.pnlPct,1)})</span></div>
+  <div class="kv mono" style="margin-top:6px"><span>Entry</span><b>${inrPrice(t.entryUsd*t.fxAtEntry)} · ${hhmm(t.openTs)} IST</b><span>Exit</span><b>${inrPrice(t.exitUsd*t.fxAtExit)} · ${hhmm(t.closeTs)} IST</b>
+  <span>Lagaya → Mila</span><b>${inr(t.costInr,2)} → ${inr(t.proceedsInr,2)}</b><span>Trigger</span><b>${esc(t.trigger)}: ${esc(t.trigReason)}</b>
+  <span>Entry reason</span><span style="color:var(--txt)">${esc(t.reason)}</span><span>Hold</span><b>${Math.round((t.closeTs-t.openTs)/60e3)} min</b></div>
+  <div style="font-size:12px;margin-top:6px">${links(t)}</div>`}
+
+function renderClosed(){const c=S.closed.slice(-15).reverse();if(!c.length){$('closed').innerHTML='—';return}
+  $('closed').innerHTML=`<table class="mono"><tr><th>Time</th><th>Coin</th><th>Why</th><th>P&amp;L</th></tr>${c.map(t=>`<tr><td>${hhmm(t.closeTs).slice(0,5)}</td><td><a target="_blank" rel="noopener" href="https://dexscreener.com/solana/${t.pair}">${esc(t.sym)}</a></td><td>${t.trigger}</td><td class="${t.pnlInr>=0?'up':'dn'}">${t.pnlInr>=0?'+':''}${inr(t.pnlInr,2)}</td></tr>`).join('')}</table>`}
+
+function renderEq(){const cv=$('eq');const dpr=window.devicePixelRatio||1;const W=cv.clientWidth,H=170;cv.width=W*dpr;cv.height=H*dpr;const x=cv.getContext('2d');x.scale(dpr,dpr);
+  const pts=S.equity;x.clearRect(0,0,W,H);if(pts.length<1)return;
+  const vals=pts.map(p=>p[1]).concat([S.startInr]);let lo=Math.log(Math.min(...vals)),hi=Math.log(Math.max(...vals));if(hi-lo<0.02){const m=(hi+lo)/2;lo=m-0.01;hi=m+0.01}
+  const pad=(hi-lo)*0.1;lo-=pad;hi+=pad;const t0=pts[0][0],t1=Math.max(pts[pts.length-1][0],t0+1);const L=52,R=6,T=8,B=18;
+  const X=t=>L+(t-t0)/(t1-t0)*(W-L-R),Y=v=>T+(hi-Math.log(v))/(hi-lo)*(H-T-B);
+  x.font='10px ui-monospace,monospace';x.fillStyle='#7c8696';x.strokeStyle='#1c2330';x.lineWidth=1;
+  for(let i=0;i<=4;i++){const lv=lo+(hi-lo)*i/4,v=Math.exp(lv),y=Y(v);x.beginPath();x.moveTo(L,y);x.lineTo(W-R,y);x.stroke();x.fillText(inr(v,0),2,y+3)}
+  x.setLineDash([4,4]);x.strokeStyle='#445';x.beginPath();x.moveTo(L,Y(S.startInr));x.lineTo(W-R,Y(S.startInr));x.stroke();x.setLineDash([]);
+  const last=pts[pts.length-1][1];x.strokeStyle=last>=S.startInr?'#3ee08f':'#ff5c7a';x.lineWidth=2;x.beginPath();
+  pts.forEach((p,i)=>{i?x.lineTo(X(p[0]),Y(p[1])):x.moveTo(X(p[0]),Y(p[1]))});x.stroke();
+  x.fillStyle='#7c8696';x.fillText(hhmm(t0).slice(0,5),L,H-4);x.textAlign='right';x.fillText(hhmm(t1).slice(0,5),W-R,H-4);x.textAlign='left'}
+
+function render(){renderTop();renderPositions();renderStats();renderTrace();renderClosed();renderEq();renderPipe()}
+
+// ====================== CONTROLS ======================
+let tPx=null,tScan=null;
+function startLoops(){clearInterval(tPx);clearInterval(tScan);tPx=setInterval(priceCycle,CFG.priceEveryMs);tScan=setInterval(scanCycle,CFG.scanEveryMs);setTimeout(()=>{priceCycle();scanCycle()},300)}
+function stopLoops(){clearInterval(tPx);clearInterval(tScan)}
+$('startBtn').onclick=()=>{if(S.running){S.sessionMs+=Date.now()-S.lastStart;S.running=false;stopLoops();log('w','STOP — Vivaan जी ne bot roka. Khule trades ka price update bhi ruk gaya.');hidePending();AG.forEach(a=>agState[a[0]]={st:'',txt:'ruka hua'})}
+  else{S.running=true;S.lastStart=Date.now();log('s','START — Night Desk chalu (paper/demo). Rules: max '+CFG.perCoinPct+'% per coin, TP +'+CFG.tpPct+'%, SL -'+CFG.slPct+'%, time-stop '+CFG.maxHoldMin+' min.');startLoops()}
+  save();render()};
+$('resetBtn').onclick=()=>{const v=Math.round(Number($('startBalIn').value));if(!(v>=100)){alert('Kam se kam ₹100 rakhiye');return}
+  if(!confirm(`Naya session ₹${v.toLocaleString('en-IN')} se shuru karein? Purana demo hisaab mit jayega.`))return;
+  stopLoops();const fxs=S.fx;S=fresh(v);S.fx=fxs;log('s',`RESET — naya demo balance ${inr(v)}`);save();render()};
+$('clearLog').onclick=()=>{S.log=[];renderLog();save()};
+$('startBalIn').value=S.startInr;
+$('rules').innerHTML=`<b>Rules (sab fixed, hidden kuch nahi):</b><br>Scanner: Solana coins DexScreener boosts/profiles + GeckoTerminal trending se · liquidity ≥ ${usdK(CFG.minLiqUsd)} · 24h vol ≥ ${usdK(CFG.minVol24Usd)} · 1h vol ≥ ${usdK(CFG.minVol1hUsd)} · ≥ ${CFG.minTxns1h} txns/1h · umar ≥ ${CFG.minAgeMin} min · mcap ≤ ${usdK(CFG.maxFdvUsd)} · 1h change ${CFG.minH1Pct}% se +${CFG.maxH1Pct}% · 5m ≥ ${CFG.minM5Pct}% · buys/sells ≥ ${CFG.minBuyRatio}<br>Rug Check (RugCheck.xyz): freeze/mint authority ON = reject · koi bhi "danger" risk (top holders, low liquidity, rugger creator…) = reject · LP lock ≥ ${CFG.minLpLockedPct}% · score ≤ ${CFG.maxRugScore}/100<br>Sizer: max ${CFG.perCoinPct}% equity per coin · max ${CFG.maxOpen} khule trades<br>Executor: live DexScreener price par paper fill · ${CFG.costPct}% cost har side · price 3% se zyada bhaag jaye to skip<br>Exit: TP +${CFG.tpPct}% · SL -${CFG.slPct}% · ${CFG.maxHoldMin} min time-stop · liquidity aadhi ho jaye to exit · price har 15 sec check`;
+
+// tick UI timer
+setInterval(()=>{renderTop()},1000);
+window.addEventListener('resize',renderEq);
+(async()=>{render();renderLog();await loadFx(true);
+  if(S.running){if(S.lastStart&&S.savedAt>S.lastStart)S.sessionMs+=S.savedAt-S.lastStart;S.lastStart=Date.now();log('w','Tab dobara khula — bot phir chalu. Jab tab band tha tab ke price moves miss hue (honest note).');startLoops()}
+  else if(/[?&]autostart=1/.test(location.search)){$('startBtn').click()}
+  render()})();
+window.__nd={S:()=>S,CFG};
+</script>
+</body>
+</html>

@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#07090d">
 <meta name="robots" content="noindex">
+<link rel="icon" href="data:,">
 <title>Night Desk · 6-Agent Paper Trading (DEMO)</title>
 <style>
 :root{--bg:#07090d;--card:#0f131a;--line:#1c2330;--txt:#e9edf3;--mut:#7c8696;--up:#3ee08f;--dn:#ff5c7a;--warn:#ffb547;--acc:#7aa2ff;--glow:#3ee08f}
@@ -18,8 +19,9 @@ button{font:inherit;color:inherit;border:0;cursor:pointer}
 .card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:12px;margin:10px 0}
 .card h3{margin:0 0 8px;font-size:13px;letter-spacing:.04em;color:var(--mut);text-transform:uppercase;font-weight:600;display:flex;justify-content:space-between;align-items:center}
 .demo{background:#3a2a00;color:#ffd27a;border:1px solid #6b4e00;border-radius:999px;padding:3px 9px;font-size:11px;font-weight:700}
-.top{display:flex;justify-content:space-between;align-items:center;gap:8px}
-.brand{font-weight:800;font-size:17px}
+.top{display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap}
+.demo{white-space:nowrap}
+.brand{font-weight:800;font-size:17px;white-space:nowrap}
 .timer{font-size:13px;color:var(--mut)}
 .bal{font-size:38px;font-weight:800;letter-spacing:-.02em;margin:6px 0 0}
 .sub{font-size:13px}
@@ -52,7 +54,7 @@ details summary{cursor:pointer;color:var(--mut);font-size:12px}
 <div class="wrap">
   <div class="top">
     <div class="brand">🌙 Night Desk <span class="mut" style="font-weight:500;font-size:12px">6-Agent</span></div>
-    <span class="demo">DEMO PAISA · असली पैसा नहीं</span>
+    <span class="demo">DEMO PAISA · असली पैसा नहीं</span><span class="demo" id="qaBadge" style="display:none;background:#102a4a;color:#9cc3ff;border-color:#2d4a8a">QA TEST MODE</span>
   </div>
   <div class="card" style="margin-top:8px">
     <div class="top"><span class="mut sub">Namaste Vivaan जी 🙏 · Total Balance (demo)</span><span class="timer mono" id="timer">⏱ 00:00:00</span></div>
@@ -148,7 +150,11 @@ const CFG = {
   scanEveryMs: 60000,
   cooldownMin: 120,
 };
-const KEY = 'nightdesk.v1';
+// Test-only QA mode: ?qa=1&hold=3&tp=5&sl=3 → alag storage key, defaults unchanged
+const QP=new URLSearchParams(location.search);const QA=QP.get('qa')==='1';
+if(QA){const n=(k,lo,hi)=>{const v=Number(QP.get(k));return v>=lo&&v<=hi?v:null};
+  const h=n('hold',1,45),tp=n('tp',1,25),sl=n('sl',1,12);if(h)CFG.maxHoldMin=h;if(tp)CFG.tpPct=tp;if(sl)CFG.slPct=sl}
+const KEY = QA?'nightdesk.qa':'nightdesk.v1';
 const STABLE = new Set(['SOL','WSOL','USDC','USDT','USD1','PYUSD','JUP','JITOSOL','MSOL','BSOL','JLP']);
 // ====================== STATE ======================
 function fresh(startInr){return {v:1,startInr,cashInr:startInr,positions:[],closed:[],log:[],equity:[[Date.now(),startInr]],running:false,sessionMs:0,lastStart:0,cooldown:{},fx:{rate:null,ts:0,src:''},cycle:0,best:null,pendingTs:0}}
@@ -198,7 +204,7 @@ async function dsTokens(mints){const out={};for(let i=0;i<mints.length;i+=30){co
   try{const arr=await getJ('https://api.dexscreener.com/tokens/v1/solana/'+chunk.join(','));
     for(const p of arr||[]){if(p.chainId!=='solana')continue;const m=p.baseToken&&p.baseToken.address;if(!m||!chunk.includes(m))continue;
       const liq=(p.liquidity&&p.liquidity.usd)||0;if(!out[m]||liq>((out[m].liquidity&&out[m].liquidity.usd)||0))out[m]=p}}
-  catch(e){log('w','DexScreener error: '+e.message)}}
+  catch(e){if(Date.now()-(dsTokens.lastErr||0)>60e3){dsTokens.lastErr=Date.now();log('w','DexScreener error: '+e.message+' — agle cycle me phir try (open trades ka last price rakha hai)')}}}
   return out}
 
 async function gatherCandidates(){
@@ -216,7 +222,7 @@ async function gatherCandidates(){
 // ====================== RUG CHECK ======================
 const rugCache={};
 async function rugCheck(mint){
-  const c=rugCache[mint];if(c&&Date.now()-c.ts<30*60e3)return c.r;
+  const c=rugCache[mint];if(c&&Date.now()-c.ts<(c.r.apiErr?3:30)*60e3)return c.r;
   let r;try{const j=await getJ('https://api.rugcheck.xyz/v1/tokens/'+mint+'/report/summary',10000);
     const risks=(j.risks||[]);const danger=risks.filter(x=>x.level==='danger');
     const reasons=[];
@@ -227,7 +233,7 @@ async function rugCheck(mint){
     const lp=Number(j.lpLockedPct);if(isFinite(lp)&&lp<CFG.minLpLockedPct)reasons.push(`LP sirf ${lp.toFixed(0)}% locked`);
     if(Number(j.score_normalised)>CFG.maxRugScore)reasons.push('RugCheck score '+j.score_normalised+'/100 (zyada risk)');
     r={ok:reasons.length===0,reasons:[...new Set(reasons)],score:j.score_normalised,lp,warns:risks.filter(x=>x.level!=='danger').map(x=>x.name)};
-  }catch(e){r={ok:false,reasons:['RugCheck data nahi mila ('+e.message+') — safety ke liye skip'],score:null,lp:null,warns:[]}}
+  }catch(e){r={ok:false,reasons:['RugCheck data nahi mila ('+e.message+') — safety ke liye skip'],score:null,lp:null,warns:[],apiErr:true}}
   rugCache[mint]={ts:Date.now(),r};return r}
 
 // ====================== SCANNER FILTER ======================
@@ -260,7 +266,7 @@ function pushEquity(){const e=equityInr();S.equity.push([Date.now(),e]);if(S.equ
 // ====================== CYCLES ======================
 let busyScan=false,busyPx=false;
 async function scanCycle(){
-  if(busyScan||!S.running)return;busyScan=true;S.cycle++;
+  if(busyScan||!S.running)return;busyScan=true;S.cycle++;const sess=S;
   try{
     await loadFx();if(!fx()){log('w','FX rate nahi hai, trade skip');return}
     if(S.positions.length>=CFG.maxOpen){ag('scan','ok',`Max ${CFG.maxOpen} trade khule, scan ruka`);return}
@@ -274,13 +280,15 @@ async function scanCycle(){
     const topRej=Object.entries(rej).sort((a,b)=>b[1]-a[1]).slice(0,3).map(([k,v])=>`${k}:${v}`).join(', ');
     ag('scan','ok',`${list.length} scan · ${pass.length} pass · ${list.length-pass.length} reject`);
     log('s',`SCAN #${S.cycle}: ${list.length} asli Solana coins (${sourcesOk}/4 sources) → ${pass.length} pass, ${list.length-pass.length} reject [${topRej}]`);
+    if(!list.length){ag('scan','fail','Data nahi mila — retry');log('w','Market data nahi mila (API down/rate-limit) — WAIT, agle cycle me phir try');return}
     if(!fresh.length){ag('rug','','koi candidate nahi');log('r','Koi naya coin filter pass nahi hua — WAIT');return}
     // rug check top 4
     ag('rug','work','RugCheck chal raha…');let pick=null,rc=null;
     for(const p of fresh.slice(0,4)){const r=await rugCheck(p.baseToken.address);
       if(r.ok){pick=p;rc=r;log('b',`RUGCHECK PASS ${p.baseToken.symbol}: score ${r.score}/100, LP lock ${isFinite(r.lp)?r.lp.toFixed(0)+'%':'?'}${r.warns.length?' · warn: '+r.warns.join(', '):''}`);break}
       log('x',`RUGCHECK FAIL ${p.baseToken.symbol} (${short(p.baseToken.address)}): ${r.reasons.join('; ')}`);
-      S.cooldown[p.baseToken.address]=Date.now()+30*60e3}
+      S.cooldown[p.baseToken.address]=Date.now()+(r.apiErr?3:30)*60e3}
+    if(S!==sess||!S.running)return;
     if(!pick){ag('rug','fail','Top coins risky nikle — skip');return}
     ag('rug','ok',`${pick.baseToken.symbol} safe lagta hai`);
     // sizer
@@ -292,24 +300,25 @@ async function scanCycle(){
     const qty=sizeInr/(entryUsd*fx());
     const profitAtTp=qty*tpUsd*fx()*(1-CFG.costPct/100)-sizeInr,lossAtSl=qty*slUsd*fx()*(1-CFG.costPct/100)-sizeInr;
     const plan={mint:pick.baseToken.address,pair:pick.pairAddress,sym:pick.baseToken.symbol,name:pick.baseToken.name,dex:pick.dexId,
-      sizeInr,entryUsd,tpUsd,slUsd,qty,profitAtTp,lossAtSl,liq:pick.liquidity.usd,h1:pick.priceChange.h1,m5:pick.priceChange.m5,
+      sizeInr,entryUsd,tpUsd,slUsd,qty,profitAtTp,lossAtSl,liq:pick.liquidity.usd,h1:pick.priceChange?.h1??0,m5:pick.priceChange?.m5??0,
       tx:pick.txns.h1,v1:pick.volume.h1,
-      reason:`1h ${pct(pick.priceChange.h1,1)}, 5m ${pct(pick.priceChange.m5,1)}, buys ${pick.txns.h1.buys}/sells ${pick.txns.h1.sells}, liq ${usdK(pick.liquidity.usd)}, 1h vol ${usdK(pick.volume.h1)}, RugCheck ${rc.score}/100`};
+      reason:`1h ${pct(pick.priceChange?.h1??0,1)}, 5m ${pct(pick.priceChange?.m5??0,1)}, buys ${pick.txns.h1.buys}/sells ${pick.txns.h1.sells}, liq ${usdK(pick.liquidity.usd)}, 1h vol ${usdK(pick.volume.h1)}, RugCheck ${rc.score}/100`};
     ag('size','ok',`${inr(sizeInr)} (${(sizeInr/eq*100).toFixed(1)}% equity)`);
     showPending(plan);
     log('s',`PLAN ${plan.sym}: lagana ${inr(sizeInr)} · Entry ${inrPrice(entryUsd*fx())} · TP ${inrPrice(tpUsd*fx())} (+${CFG.tpPct}% → ${inr(profitAtTp,2)}) · SL ${inrPrice(slUsd*fx())} (-${CFG.slPct}% → ${inr(lossAtSl,2)})`);
     await new Promise(r=>setTimeout(r,4000));
-    if(!S.running){hidePending();log('r','Stop dabaya — plan cancel');return}
+    if(S!==sess||!S.running){hidePending();log('r','Stop/Reset dabaya — plan cancel');return}
     // executor: re-fetch live price for fill
     ag('exec','work','Live price par paper fill…');
-    const live=(await dsTokens([plan.mint]))[plan.mint];const livePx=live?Number(live.priceUsd):NaN;
+    const live=(await dsTokens([plan.mint]))[plan.mint];
+    if(S!==sess||!S.running){hidePending();log('r','Stop/Reset dabaya — plan cancel');return}const livePx=live?Number(live.priceUsd):NaN;
     if(!(livePx>0)){ag('exec','fail','Price nahi mila');log('w','Fill ke time price nahi mila — skip');hidePending();return}
     const drift=(livePx/pxUsd-1)*100;
     if(drift>3){ag('exec','fail',`Price ${pct(drift,1)} bhaag gaya`);log('w',`SKIP ${plan.sym}: plan ke baad price ${pct(drift,1)} upar, chase nahi karenge`);hidePending();return}
     const fillUsd=livePx*(1+CFG.costPct/100);const q=sizeInr/(fillUsd*fx());
     const pos={id:Date.now(),mint:plan.mint,pair:plan.pair,sym:plan.sym,name:plan.name,dex:plan.dex,qty:q,costInr:sizeInr,fxAtEntry:fx(),
       entryUsd:fillUsd,rawEntryUsd:livePx,tpUsd:fillUsd*(1+CFG.tpPct/100),slUsd:fillUsd*(1-CFG.slPct/100),lastUsd:livePx,peakUsd:livePx,
-      openTs:Date.now(),reason:plan.reason};
+      openTs:Date.now(),reason:plan.reason,liqAtEntry:(live.liquidity&&live.liquidity.usd)||plan.liq};
     S.cashInr-=sizeInr;S.positions.push(pos);hidePending();
     ag('exec','ok',`BUY ${pos.sym} @ ${inrPrice(fillUsd*fx())}`);
     log('b',`BUY ${pos.sym} ${inr(sizeInr)} @ ${inrPrice(fillUsd*fx())} (live $${livePx.toPrecision(5)} +${CFG.costPct}% cost) · reason: ${plan.reason}`);
@@ -318,10 +327,11 @@ async function scanCycle(){
   finally{busyScan=false;save()}}
 
 async function priceCycle(){
-  if(busyPx||!S.running)return;busyPx=true;
+  if(busyPx||!S.running)return;busyPx=true;const sess=S;
   try{
     if(S.positions.length){
       const px=await dsTokens(S.positions.map(p=>p.mint));
+      if(S!==sess||!S.running)return;
       for(const p of [...S.positions]){const d=px[p.mint];if(!d){continue}const u=Number(d.priceUsd);if(!(u>0))continue;
         p.lastUsd=u;p.peakUsd=Math.max(p.peakUsd,u);
         const exitUsd=u*(1-CFG.costPct/100);const held=(Date.now()-p.openTs)/60e3;
@@ -329,7 +339,7 @@ async function priceCycle(){
         if(u>=p.tpUsd)trig=['TP','Take-profit hit (+'+CFG.tpPct+'% target)'];
         else if(u<=p.slUsd)trig=['SL','Stop-loss hit (-'+CFG.slPct+'%)'];
         else if(held>=CFG.maxHoldMin)trig=['TIME',`${CFG.maxHoldMin} min ho gaye, time-stop`];
-        else if((d.liquidity?.usd||0)<CFG.minLiqUsd*0.5)trig=['LIQ','Liquidity aadhi se kam — bahar nikle'];
+        else if(d.liquidity&&d.liquidity.usd>0&&d.liquidity.usd<(p.liqAtEntry||CFG.minLiqUsd)*0.5)trig=['LIQ',`Liquidity aadhi se kam (${usdK(p.liqAtEntry||CFG.minLiqUsd)} → ${usdK(d.liquidity.usd)}) — bahar nikle`];
         if(trig)closePos(p,u,exitUsd,trig)}
     }
     pushEquity();render();save()
@@ -373,10 +383,10 @@ function renderPositions(){$('opencnt').textContent=S.positions.length;const r=f
 
 function renderStats(){const c=S.closed;const w=c.filter(x=>x.pnlInr>0).length,l=c.length-w;const wr=c.length?w/c.length*100:null;
   const best=c.length?c.reduce((a,b)=>b.pnlPct>a.pnlPct?b:a):null,worst=c.length?c.reduce((a,b)=>b.pnlPct<a.pnlPct?b:a):null;
-  const realized=c.reduce((s,x)=>s+x.pnlInr,0);const fees=c.reduce((s,x)=>s+x.costInr*CFG.costPct/100+x.proceedsInr*CFG.costPct/(100-CFG.costPct),0);
+  const realized=c.reduce((s,x)=>s+x.pnlInr,0);const fees=c.reduce((s,x)=>s+x.costInr*CFG.costPct/(100+CFG.costPct)+x.proceedsInr*CFG.costPct/(100-CFG.costPct),0);
   $('stats').innerHTML=`<span>Win rate</span><b>${wr==null?'—':wr.toFixed(1)+'%'}</b><span>Jeet / Haar</span><b><span class="up">${w}</span> / <span class="dn">${l}</span> (total ${c.length})</b>
-  <span>Best trade</span><b class="up">${best?esc(best.sym)+' '+pct(best.pnlPct,1)+' ('+inr(best.pnlInr,2)+')':'—'}</b>
-  <span>Worst trade</span><b class="dn">${worst?esc(worst.sym)+' '+pct(worst.pnlPct,1)+' ('+inr(worst.pnlInr,2)+')':'—'}</b>
+  <span>Best trade</span><b class="${best&&best.pnlInr<0?'dn':'up'}">${best?esc(best.sym)+' '+pct(best.pnlPct,1)+' ('+inr(best.pnlInr,2)+')':'—'}</b>
+  <span>Worst trade</span><b class="${worst&&worst.pnlInr>=0?'up':'dn'}">${worst?esc(worst.sym)+' '+pct(worst.pnlPct,1)+' ('+inr(worst.pnlInr,2)+')':'—'}</b>
   <span>Realized P&amp;L</span><b class="${realized>=0?'up':'dn'}">${realized>=0?'+':''}${inr(realized,2)}</b><span>Fees (approx)</span><b>${inr(fees,2)}</b>`;
   const cv=$('donut'),x=cv.getContext('2d');x.clearRect(0,0,220,220);x.lineWidth=26;
   x.beginPath();x.strokeStyle='#1c2330';x.arc(110,110,80,0,Math.PI*2);x.stroke();
@@ -430,7 +440,8 @@ window.addEventListener('resize',renderEq);
   if(S.running){if(S.lastStart&&S.savedAt>S.lastStart)S.sessionMs+=S.savedAt-S.lastStart;S.lastStart=Date.now();log('w','Tab dobara khula — bot phir chalu. Jab tab band tha tab ke price moves miss hue (honest note).');startLoops()}
   else if(/[?&]autostart=1/.test(location.search)){$('startBtn').click()}
   render()})();
-window.__nd={S:()=>S,CFG};
+if(QA)$('qaBadge').style.display='inline-block';
+window.__nd={S:()=>S,CFG,QA};
 </script>
 </body>
 </html>

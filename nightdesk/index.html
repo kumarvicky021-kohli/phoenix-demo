@@ -48,6 +48,13 @@ canvas{width:100%;display:block}
 table{width:100%;border-collapse:collapse;font-size:12px}td,th{padding:5px 3px;border-top:1px solid var(--line);text-align:left}th{color:var(--mut);font-weight:600}
 .foot{font-size:11.5px;color:var(--mut);line-height:1.5}
 details summary{cursor:pointer;color:var(--mut);font-size:12px}
+.acc{color:var(--acc)}
+.rsg{display:grid;grid-template-columns:repeat(5,1fr);gap:6px}.rst{background:#0b0f15;border:1px solid var(--line);border-radius:10px;padding:7px 4px;text-align:center;min-width:0;word-break:break-word}
+.kbar{display:grid;grid-template-columns:minmax(0,1.3fr) 1fr 28px;gap:6px;align-items:center;font-size:12px;margin:3px 0}.kbar .bar{background:#1a2230;border-radius:6px;height:8px;overflow:hidden}.kbar .bar i{display:block;height:100%;background:var(--dn)}.kbar b{text-align:right}
+.rsc{border:1px solid var(--line);border-radius:10px;padding:8px;margin:6px 0;background:#0b0f15;word-break:break-word}
+.vb{font-size:11px;font-weight:800;padding:2px 8px;border-radius:999px;background:#1a2230;white-space:nowrap}
+.rsi{display:grid;grid-template-columns:1fr 100px;gap:2px 8px;align-items:center;font-size:12px;margin:5px 0}.rsi .num{width:100px}
+@media(max-width:380px){.rsg{grid-template-columns:repeat(3,1fr)}}
 </style>
 </head>
 <body>
@@ -81,6 +88,13 @@ details summary{cursor:pointer;color:var(--mut);font-size:12px}
   <div class="card">
     <h3>Open Positions (khule trade) <span class="pill" id="opencnt">0</span></h3>
     <div id="positions" class="mut sub">Abhi koi trade khula nahi hai.</div>
+  </div>
+
+  <div class="card" id="rsCard">
+    <h3>🛡️ Rug Shield · सुरक्षा कवच <span class="pill">kharidne se pehle</span></h3>
+    <div class="mut" style="font-size:11.5px;margin-bottom:8px">Har coin pehle hard kill list se guzarta hai, phir HOLDERS aur HYPE alag-alag jaanche jaate hain. Sirf PASS wale coin par hi demo trade hota hai.</div>
+    <div id="rsBody"></div>
+    <details style="margin-top:8px"><summary>⚙️ Shield ki limits (badal sakte hain)</summary><div id="rsCfg" style="margin-top:6px"></div></details>
   </div>
 
   <div class="card">
@@ -155,7 +169,7 @@ const QP=new URLSearchParams(location.search);const QA=QP.get('qa')==='1';
 if(QA){const n=(k,lo,hi)=>{const v=Number(QP.get(k));return v>=lo&&v<=hi?v:null};
   const h=n('hold',1,45),tp=n('tp',1,25),sl=n('sl',1,12);if(h)CFG.maxHoldMin=h;if(tp)CFG.tpPct=tp;if(sl)CFG.slPct=sl}
 const KEY = QA?'nightdesk.qa':'nightdesk.v1';
-const STABLE = new Set(['SOL','WSOL','USDC','USDT','USD1','PYUSD','JUP','JITOSOL','MSOL','BSOL','JLP']);
+const STABLE = new Set(['SOL','WSOL','USDC','USDT','USD1','PYUSD','JUP','JITOSOL','MSOL','BSOL','JLP','RAY','PUMP','WETH','WBTC','CBBTC','HSOL','JUPSOL','INF','BNSOL']);
 // ====================== STATE ======================
 function fresh(startInr){return {v:1,startInr,cashInr:startInr,positions:[],closed:[],log:[],equity:[[Date.now(),startInr]],running:false,sessionMs:0,lastStart:0,cooldown:{},fx:{rate:null,ts:0,src:''},cycle:0,best:null,pendingTs:0}}
 let S;
@@ -184,7 +198,7 @@ function renderLog(){const el=$('log');const atBottom=el.scrollHeight-el.scrollT
   if(atBottom)el.scrollTop=el.scrollHeight}
 
 // ====================== AGENTS UI ======================
-const AG=[['scan','1 · Scanner','स्कैनर'],['rug','2 · Rug Check','सुरक्षा जांच'],['size','3 · Sizer','कितना लगाना'],['exec','4 · Executor','पेपर ऑर्डर'],['logr','5 · Logger','हिसाब'],['eq','6 · Equity','बैलेंस ग्राफ']];
+const AG=[['scan','1 · Scanner','स्कैनर'],['rug','2 · Rug Shield','सुरक्षा कवच'],['size','3 · Sizer','कितना लगाना'],['exec','4 · Executor','पेपर ऑर्डर'],['logr','5 · Logger','हिसाब'],['eq','6 · Equity','बैलेंस ग्राफ']];
 const agState={};AG.forEach(a=>agState[a[0]]={st:'',txt:'idle'});
 function ag(k,st,txt){agState[k]={st,txt};renderPipe()}
 function renderPipe(){$('pipe').innerHTML=AG.map(([k,n,h])=>`<div class="ag ${agState[k].st}"><div class="n">${n}</div><div class="t"><span class="dot"></span>${h}</div><div class="s">${esc(agState[k].txt)}</div></div>`).join('')}
@@ -236,6 +250,150 @@ async function rugCheck(mint){
   }catch(e){r={ok:false,reasons:['RugCheck data nahi mila ('+e.message+') — safety ke liye skip'],score:null,lp:null,warns:[],apiErr:true}}
   rugCache[mint]={ts:Date.now(),r};return r}
 
+// ====================== RUG SHIELD ======================
+const RS_DEF={maxTop10Pct:30,maxDevPct:10,minLiqUsd:15000,minAgeMin:3,maxInsiderPct:15,minLpLockedPct:50};
+const RS_KEY=QA?'nightdesk.qa.rscfg':'nightdesk.rscfg';
+const RS={...RS_DEF};try{const o=JSON.parse(localStorage.getItem(RS_KEY)||'{}');for(const k in RS_DEF)if(isFinite(Number(o[k])))RS[k]=Number(o[k])}catch(e){}
+const RS_PER_CYCLE=6,RS_WATCH_MIN=10,RS_PASS_TTL=30,RS_KILL_TTL=120,RS_HUMAN_TTL=60;
+const qn=(k,lo,hi)=>{const v=Number(QP.get(k));return QA&&v>=lo&&v<=hi?v:null};
+const FU=[qn('fu1',1,30)||30,qn('fu2',2,120)||120]; // follow-up checks (min)
+const VL={KILL:'KILL · रद्द',WATCH:'WATCH · नज़र',PASS_SMALL:'PASS · छोटा दांव',HUMAN:'HUMAN · आपकी नज़र'};
+const VC={KILL:'dn',WATCH:'warn',PASS_SMALL:'up',HUMAN:'acc'};
+const KL={rugged:'Pehle hi rug',mint:'Mint authority ON',freeze:'Freeze authority ON',delegate:'Permanent delegate',lp:'LP lock/burn nahi',top10:'Top 10 holders zyada',dev:'Dev ke paas zyada',liq:'Liquidity kam',age:'Pair bahut naya',ins:'Insider/bundle zyada',creator:'Dev pehle rug kar chuka'};
+const fx2=(v,lim)=>Math.abs(v-lim)<0.1?v.toFixed(2):v.toFixed(1);
+function rsInit(){if(!S.rs||typeof S.rs!=='object')S.rs={recs:{},since:Date.now()};return S.rs}
+const rcCache={};
+async function rcReport(mint,maxAgeMin){const c=rcCache[mint];if(c&&Date.now()-c.ts<(c.err?3:maxAgeMin)*60e3)return c;
+  let r;try{const j=await getJ('https://api.rugcheck.xyz/v1/tokens/'+mint+'/report',12000);if(!j||!j.mint)throw new Error('khali jawab');r={ts:Date.now(),j}}
+  catch(e){r={ts:Date.now(),err:e.name==='AbortError'?'timeout':e.message}}
+  rcCache[mint]=r;return r}
+function rsNeedsEval(r){if(!r)return true;const age=(Date.now()-r.ts)/60e3;
+  if(r.v==='WATCH')return age>=RS_WATCH_MIN&&r.evals<4;if(r.v==='PASS_SMALL')return age>=RS_PASS_TTL;if(r.v==='KILL')return age>=RS_KILL_TTL;return age>=RS_HUMAN_TTL}
+async function shieldEval(p,mkt){
+  const rs=rsInit();const mint=p.baseToken.address;const prev=rs.recs[mint];
+  const rep=await rcReport(mint,prev&&prev.v==='WATCH'?RS_WATCH_MIN-1:20);const j=rep.j;
+  const kills=[],unk=[],F={};const K=(c,t)=>kills.push([c,t]),U=(c,t)=>unk.push([c,t]);
+  // --- HARD KILL LIST (sabse pehle) ---
+  const liq=p.liquidity&&p.liquidity.usd;
+  const age=p.pairCreatedAt?(Date.now()-p.pairCreatedAt)/60e3:null;
+  if(j&&j.rugged)K('rugged','RugCheck ke hisaab se pehle hi rug ho chuka');
+  if(j&&j.mintAuthority)K('mint','Mint authority ON — naye token chhap sakte hain');
+  if(j&&j.freezeAuthority)K('freeze','Freeze authority ON — aapke token freeze ho sakte (honeypot)');
+  if(j&&j.token_extensions&&j.token_extensions.permanentDelegate)K('delegate','Permanent delegate ON — token kisi bhi wallet se nikaale ja sakte');
+  let mk=[],supply=NaN;
+  if(j){mk=j.markets||[];supply=Number(j.token&&j.token.supply);
+    let m=mk.find(x=>x.pubkey===p.pairAddress);
+    if(!m&&mk.length)m=mk.slice().sort((a,b)=>((b.lp&&b.lp.quoteUSD)||0)+((b.lp&&b.lp.baseUSD)||0)-((a.lp&&a.lp.quoteUSD)||0)-((a.lp&&a.lp.baseUSD)||0))[0];
+    if(!m)U('lp','LP / pool data nahi mila');
+    else if(/^pump_fun/.test(m.marketType||'')||p.dexId==='pumpswap'){F.lp='burned (PumpSwap)'}
+    else{const lp=Number(m.lp&&m.lp.lpLockedPct);if(!isFinite(lp))U('lp','LP lock % nahi pata');else{F.lp=lp.toFixed(0)+'%';if(lp<RS.minLpLockedPct)K('lp',`LP sirf ${lp.toFixed(0)}% lock/burn (${m.marketType}) — liquidity kabhi bhi nikal sakti`)}}
+    const ka=j.knownAccounts||{};const pool=new Set();mk.forEach(x=>[x.pubkey,x.liquidityAAccount,x.liquidityBAccount].forEach(a=>a&&pool.add(a)));
+    const isPool=h=>pool.has(h.address)||pool.has(h.owner)||['AMM','LOCKER'].includes((ka[h.owner]||{}).type)||['AMM','LOCKER'].includes((ka[h.address]||{}).type);
+    const top=j.topHolders||[];
+    if(!top.length)U('top10','Top holders list nahi mili');
+    else{F.top10=top.filter(h=>!isPool(h)).slice(0,10).reduce((s,h)=>s+(Number(h.pct)||0),0);
+      if(F.top10>RS.maxTop10Pct)K('top10',`Top 10 wallets ke paas ${fx2(F.top10,RS.maxTop10Pct)}% (pool ke bina) > ${RS.maxTop10Pct}%`)}
+    if(!j.creator||!(supply>0))U('dev','Dev/creator ka balance nahi pata');
+    else{F.dev=Number(j.creatorBalance||0)/supply*100;if(F.dev>RS.maxDevPct)K('dev',`Dev ke paas ${fx2(F.dev,RS.maxDevPct)}% supply > ${RS.maxDevPct}%`)}
+    const nets=Array.isArray(j.insiderNetworks)?j.insiderNetworks:[];F.insN=Number(j.graphInsidersDetected)||0;
+    if(F.insN>0&&!nets.length||!(supply>0))U('ins','Insider wallets ka % nahi nikla');
+    else{F.ins=nets.reduce((s,x)=>s+(Number(x.currentHolding)||0),0)/supply*100;if(F.ins>RS.maxInsiderPct)K('ins',`Insider/bundle wallets (${F.insN}) ke paas ${fx2(F.ins,RS.maxInsiderPct)}% > ${RS.maxInsiderPct}%`)}
+    F.risks=(j.risks||[]).map(r=>({n:r.name,l:r.level}));
+    if(F.risks.some(r=>/creator history of rugged/i.test(r.n)))K('creator','Is coin ka dev pehle bhi rug kar chuka hai (RugCheck history)');
+    F.ctok=Array.isArray(j.creatorTokens)?j.creatorTokens.length:0;F.holders=Number(j.totalHolders)||null;F.score=j.score_normalised;
+  } else ['lp','top10','dev','ins','creator','mint','freeze'].forEach(c=>U(c,'RugCheck data nahi mila ('+rep.err+')'));
+  if(!(liq>0))U('liq','Liquidity data nahi');else if(liq<RS.minLiqUsd)K('liq',`Liquidity sirf ${usdK(liq)} < ${usdK(RS.minLiqUsd)}`);
+  if(age==null)U('age','Pair kab bana, pata nahi');else if(age<RS.minAgeMin)K('age',`Pair sirf ${age.toFixed(1)} min purana`);
+  // --- HOLDERS seat ---
+  const H={st:'clean',f:[],n:[]};
+  if(!j)H.st='unknown';else{
+    if(F.top10!=null){H.n.push(`top10 ${F.top10.toFixed(1)}%`);if(F.top10>RS.maxTop10Pct*0.67&&F.top10<=RS.maxTop10Pct)H.f.push(`Top 10 ke paas ${F.top10.toFixed(1)}% (limit ke kareeb)`)}
+    if(F.ins!=null){H.n.push(`insiders ${F.ins.toFixed(1)}%`);if(F.ins>5&&F.ins<=RS.maxInsiderPct)H.f.push(`Insider/bundle wallets ${F.ins.toFixed(1)}%`)}
+    if(F.dev!=null){H.n.push(`dev ${F.dev.toFixed(1)}%`);if(F.dev>3&&F.dev<=RS.maxDevPct)H.f.push(`Dev ke paas ${F.dev.toFixed(1)}%`)}
+    if(F.ctok>=5)H.f.push(`Dev ne ${F.ctok} aur coins banaye (serial launcher)`);
+    if(F.holders!=null){H.n.push(`${F.holders} holders`);if(F.holders<300)H.f.push(`Sirf ${F.holders} holders`)}
+    F.risks.filter(r=>r.l==='danger'&&!/creator history of rugged|freeze authority|mint authority|low liquidity|lp unlocked|top 10 holders/i.test(r.n)).forEach(r=>H.f.push('RugCheck danger: '+r.n));
+    if(Number(F.score)>CFG.maxRugScore)H.f.push(`RugCheck score ${F.score}/100`);
+    if(H.f.length)H.st='flag'}
+  // --- HYPE seat (sirf free DexScreener data; X post count nahi) ---
+  const Y={st:'clean',f:[],n:[]};const inf=p.info||{};const soc=((inf.socials||[]).length)+((inf.websites||[]).length);
+  const t5=(p.txns&&p.txns.m5)||null,t1=(p.txns&&p.txns.h1)||null;
+  if(!t1)Y.st='unknown';else{
+    const n5=(t5?t5.buys+t5.sells:0),n1=t1.buys+t1.sells,r5=t5?t5.buys/Math.max(1,t5.sells):null,r1=t1.buys/Math.max(1,t1.sells);
+    Y.n.push(`${soc} links`,`buy/sell 1h ${r1.toFixed(2)}`,`5m ${r5==null?'?':r5.toFixed(2)}`,`${n1} txns/1h`);if(p.boosts&&p.boosts.active)Y.n.push(`boost ${p.boosts.active}`);
+    if(!soc)Y.f.push('Koi website/social link nahi');
+    if(n5>=10&&r5<0.8)Y.f.push(`5 min me sellers bhaari (buy/sell ${r5.toFixed(2)})`);
+    if(r1<0.9)Y.f.push(`1 ghante me sellers bhaari (buy/sell ${r1.toFixed(2)})`);
+    if(n1<40)Y.f.push(`1 ghante me sirf ${n1} txns`);
+    if(p.boosts&&p.boosts.active&&n1<150)Y.f.push(`Paid boost hai par asli activity kam (${n1} txns/1h)`);
+    if(Y.f.length)Y.st='flag'}
+  // --- VERDICT (ek deciding reason) ---
+  const evals=(prev?prev.evals:0)+1;let v,why;
+  if(kills.length){v='KILL';why=kills[0][1]}
+  else if(unk.length){if(prev&&prev.unk&&prev.unk.length){v='HUMAN';why='Dobara check par bhi data nahi: '+unk[0][1]}else{v='WATCH';why='Data adhoora ('+unk[0][1]+') — 10 min me dobara'}}
+  else if(H.st==='flag'&&Y.st==='flag'){v='HUMAN';why=`Dono taraf shak: HOLDERS "${H.f[0]}" + HYPE "${Y.f[0]}"`}
+  else if(H.st==='flag'){v='WATCH';why='HOLDERS: '+H.f[0]+' — 10 min me dobara'}
+  else if(Y.st==='flag'){v='WATCH';why='HYPE: '+Y.f[0]+' — 10 min me dobara'}
+  else{v='PASS_SMALL';why=`Dono seats saaf · ${H.n.slice(0,3).join(', ')} · ${Y.n[1]}`}
+  const px=Number(p.priceUsd);
+  const rec={mint,sym:p.baseToken.symbol,pair:p.pairAddress,first:prev?prev.first:Date.now(),ts:Date.now(),evals,v,why,kills:kills.map(k=>k[0]),
+    unk:unk.map(u=>u[0]),H:{st:H.st,f:H.f,n:H.n},Y:{st:Y.st,f:Y.f,n:Y.n},mkt:mkt||'pass',lp:F.lp,px,liq,trk:prev?prev.trk:null,firstKills:prev?prev.firstKills:null,hist:((prev&&prev.hist)||[]).concat([[Date.now(),v]]).slice(-6)};
+  if(v==='KILL'&&!rec.firstKills)rec.firstKills=rec.kills;
+  if((v==='KILL'||v==='PASS_SMALL')&&!rec.trk&&px>0)rec.trk={v,t:Date.now(),p0:px,l0:liq||null,pair:p.pairAddress,c:[]};
+  rs.recs[mint]=rec;rsPrune();return rec}
+function rsPrune(){const rs=S.rs;const ks=Object.keys(rs.recs);if(ks.length<=600)return;
+  ks.sort((a,b)=>rs.recs[a].ts-rs.recs[b].ts);let n=ks.length-600;
+  for(const k of ks){if(n<=0)break;const r=rs.recs[k];if(r.trk&&!r.trk.done)continue;delete rs.recs[k];n--}}
+async function dsPairs(pairs){const out={};for(let i=0;i<pairs.length;i+=30){const ch=pairs.slice(i,i+30);
+  try{const j=await getJ('https://api.dexscreener.com/latest/dex/pairs/solana/'+ch.join(','));for(const p of (j&&j.pairs)||[])if(p&&p.pairAddress&&Number(p.priceUsd)>0)out[p.pairAddress]=p}catch(e){}}return out}
+let busyFu=false;
+async function followUps(){if(busyFu||!S.rs)return;busyFu=true;const rs=S.rs;
+  try{const now=Date.now();const due=Object.values(rs.recs).filter(r=>r.trk&&!r.trk.done&&now-r.trk.t>=FU[r.trk.c.length]*60e3).slice(0,60);
+    if(!due.length)return;
+    const byPair=await dsPairs(due.map(r=>r.trk.pair).filter(Boolean));
+    const miss=due.filter(r=>!byPair[r.trk.pair]).map(r=>r.mint);const byTok=miss.length?await dsTokens(miss):{};
+    if(S.rs!==rs)return;
+    for(const r of due){const t=r.trk;const d=byPair[t.pair]||byTok[r.mint];const u=d?Number(d.priceUsd):NaN,l=d&&d.liquidity?d.liquidity.usd:null;
+      const c={t:Date.now(),min:Math.round((Date.now()-t.t)/60e3),px:u>0?u:null,liq:l>0?l:(d&&d.liquidity?0:null)};
+      c.pr=c.px&&t.p0?c.px/t.p0:null;c.lr=c.liq!=null&&t.l0?c.liq/t.l0:null;
+      c.lab=((c.pr!=null&&c.pr<=0.2)||(c.lr!=null&&c.lr<=0.2))?'rugged':(c.pr!=null&&c.pr>=2)?'pumped':(c.pr==null&&c.lr==null)?'unknown':'none';
+      t.c.push(c);if(c.lab==='rugged')t.out='rugged';else if(c.lab==='pumped'&&t.out!=='rugged')t.out='pumped';
+      if(t.c.length>=FU.length){t.done=true;if(!t.out)t.out=t.c.every(x=>x.lab==='unknown')?'unknown':'none'}
+      log(c.lab==='rugged'?'x':c.lab==='pumped'?'b':'r',`FOLLOW-UP ${r.sym} [${t.v}] ${c.min} min baad: price ${c.pr==null?'?':pct((c.pr-1)*100,0)}, liquidity ${c.lr==null?'?':pct((c.lr-1)*100,0)} → ${c.lab==='rugged'?'RUG HUA':c.lab==='pumped'?'PUMP HUA (2x+)':c.lab==='unknown'?'data nahi mila':'na rug, na 2x'}`)}
+    save();renderShield()}
+  catch(e){log('w','Follow-up error: '+e.message)}finally{busyFu=false}}
+function rsStats(){const rs=rsInit();const R=Object.values(rs.recs);const n={seen:R.length,KILL:0,WATCH:0,PASS_SMALL:0,HUMAN:0};const kr={};
+  const o={kr:0,kw:0,kn:0,kp:0,pr:0,pp:0,pn:0,pnd:0};
+  for(const r of R){n[r.v]++;(r.firstKills||[]).forEach(k=>kr[k]=(kr[k]||0)+1);
+    const t=r.trk;if(!t)continue;const out=t.out||(t.done?'none':null);
+    if(t.v==='KILL'){if(out==='rugged')o.kr++;else if(out==='pumped')o.kw++;else if(t.done)o.kn++;else o.kp++}
+    else{if(out==='rugged')o.pr++;else if(out==='pumped')o.pp++;else if(t.done)o.pn++;else o.pnd++}}
+  return {n,kr:Object.entries(kr).sort((a,b)=>b[1]-a[1]),o,R}}
+function renderShield(){const el=$('rsBody');if(!el)return;const {n,kr,o,R}=rsStats();
+  const tile=(lab,val,cls)=>`<div class="rst"><div class="mono ${cls||''}" style="font-size:20px;font-weight:800">${val}</div><div class="mut" style="font-size:11px">${lab}</div></div>`;
+  const maxK=kr.length?kr[0][1]:1;
+  const hum=R.filter(r=>r.v==='HUMAN').sort((a,b)=>b.ts-a.ts).slice(0,4);
+  const recent=R.slice().sort((a,b)=>b.ts-a.ts).slice(0,6);
+  const card=r=>{const t=r.trk;const fu=t&&t.c.length?t.c.map(c=>`${c.min}m: ${c.lab==='rugged'?'<span class="dn">rug</span>':c.lab==='pumped'?'<span class="up">2x+</span>':c.lab==='unknown'?'?':(c.pr==null?'?':pct((c.pr-1)*100,0))}`).join(' · '):(t?'follow-up baaki':'');
+    return `<div class="rsc"><div class="top"><b>${esc(r.sym)}</b><span class="vb ${VC[r.v]}">${VL[r.v]}</span></div>
+    <div style="font-size:12.5px;margin-top:3px">${esc(r.why)}</div>
+    <div class="mut" style="font-size:11px;margin-top:3px">HOLDERS: <span class="${r.H.st==='clean'?'up':r.H.st==='flag'?'warn':''}">${r.H.st==='clean'?'saaf':r.H.st==='flag'?'shak':'pata nahi'}</span> · HYPE: <span class="${r.Y.st==='clean'?'up':r.Y.st==='flag'?'warn':''}">${r.Y.st==='clean'?'saaf':r.Y.st==='flag'?'shak':'pata nahi'}</span> · market filter: ${r.mkt==='pass'?'pass':esc(r.mkt)} · ${hhmm(r.ts).slice(0,5)} IST${fu?' · '+fu:''}</div>
+    <div style="font-size:11px;margin-top:2px"><a target="_blank" rel="noopener" href="https://dexscreener.com/solana/${r.pair}">DexScreener</a> · <a target="_blank" rel="noopener" href="https://rugcheck.xyz/tokens/${r.mint}">RugCheck</a> <span class="mut mono">${short(r.mint)}</span></div></div>`};
+  el.innerHTML=`<div class="rsg">${tile('Dekhe',n.seen)}${tile('KILL',n.KILL,'dn')}${tile('WATCH',n.WATCH,'warn')}${tile('PASS',n.PASS_SMALL,'up')}${tile('HUMAN',n.HUMAN,'acc')}</div>
+  <div class="sub" style="margin:10px 0 4px;font-weight:700">Sabse zyada KILL kyun hue <span class="mut" style="font-weight:400;font-size:11px">(ek coin me kai kaaran ho sakte)</span></div>
+  ${kr.length?kr.slice(0,6).map(([k,v])=>`<div class="kbar"><span>${esc(KL[k]||k)}</span><span class="bar"><i style="width:${Math.max(4,v/maxK*100)}%"></i></span><b class="mono">${v}</b></div>`).join(''):'<div class="mut sub">Abhi tak koi KILL nahi.</div>'}
+  <div class="sub" style="margin:10px 0 4px;font-weight:700">Baad me kya hua? (follow-up ${FU[0]} min + ${FU[1]} min)</div>
+  <div class="rsg">${tile('Rug bacha (sahi kill)',o.kr,'up')}${tile('Galat kill (pump hua)',o.kw,'warn')}${tile('Pass ke baad rug',o.pr,'dn')}${tile('Pass ke baad 2x',o.pp,'up')}${tile('Check baaki',o.kp+o.pnd)}</div>
+  <div class="mut" style="font-size:11px;margin-top:4px">Rug = price ya liquidity 80%+ gir gayi · Pump = price 2x+ · Kill hue jo na rug na pump: ${o.kn} · Pass jo na rug na pump: ${o.pn}. Sirf tab check hota hai jab tab khula ho.</div>
+  ${hum.length?`<div class="sub" style="margin:10px 0 4px;font-weight:700">🙏 Vivaan जी, in coins par aapki nazar chahiye (auto-buy nahi hoga)</div>${hum.map(card).join('')}`:''}
+  <div class="sub" style="margin:10px 0 4px;font-weight:700">Taaza faisle</div>${recent.length?recent.map(card).join(''):'<div class="mut sub">Start dabane ke baad yahan har coin ka faisla aur kaaran dikhega.</div>'}`}
+function renderRsCfg(){const f=[['maxTop10Pct','Top 10 holders max %'],['maxDevPct','Dev/creator max %'],['minLiqUsd','Liquidity kam se kam ($)'],['minAgeMin','Pair umar kam se kam (min)'],['maxInsiderPct','Insider/bundle max %'],['minLpLockedPct','LP lock/burn kam se kam %']];
+  $('rsCfg').innerHTML=f.map(([k,l])=>`<label class="rsi"><span>${l} <span class="mut" style="font-size:10.5px">(default ${RS_DEF[k]})</span></span><input class="num" type="number" min="0" step="any" id="rs_${k}" value="${RS[k]}"></label>`).join('')+
+  `<div class="row" style="margin-top:6px"><button class="btn sm" id="rsSave">Save</button><button class="btn sm" id="rsDef">Default</button><button class="btn sm" id="rsClear">Shield data clear</button></div><div class="mut" style="font-size:11px;margin-top:4px">Naye limits agle check se lagu honge. Hard kill list: mint/freeze authority ON, LP lock/burn kam, top 10 zyada, dev zyada, liquidity kam, pair bahut naya, insider/bundle zyada, dev ka rug history, pehle se rugged.</div>`;
+  $('rsSave').onclick=()=>{for(const k in RS_DEF){const v=Number($('rs_'+k).value);if(isFinite(v)&&v>=0)RS[k]=v}localStorage.setItem(RS_KEY,JSON.stringify(RS));log('s','Rug Shield limits save: '+JSON.stringify(RS));renderRsCfg();renderShield()};
+  $('rsDef').onclick=()=>{Object.assign(RS,RS_DEF);localStorage.removeItem(RS_KEY);log('s','Rug Shield limits default par');renderRsCfg()};
+  $('rsClear').onclick=()=>{if(!confirm('Rug Shield ka saara hisaab (faisle aur follow-up) mita dein?'))return;S.rs={recs:{},since:Date.now()};save();renderShield()}}
+
 // ====================== SCANNER FILTER ======================
 function filterPair(p){
   const sym=(p.baseToken.symbol||'').toUpperCase();
@@ -275,22 +433,26 @@ async function scanCycle(){
     const pairs=await dsTokens(mints);const list=Object.values(pairs);
     const rej={};const pass=[];
     for(const p of list){const why=filterPair(p);if(why){const k=why.split(':')[0];rej[k]=(rej[k]||0)+1}else pass.push(p)}
-    const held=new Set(S.positions.map(x=>x.mint));
+    const held=new Set(S.positions.map(x=>x.mint));const passSet=new Set(pass.map(p=>p.baseToken.address));
     const fresh=pass.filter(p=>!held.has(p.baseToken.address)&&!(S.cooldown[p.baseToken.address]>Date.now())).sort((a,b)=>scorePair(b)-scorePair(a));
     const topRej=Object.entries(rej).sort((a,b)=>b[1]-a[1]).slice(0,3).map(([k,v])=>`${k}:${v}`).join(', ');
     ag('scan','ok',`${list.length} scan · ${pass.length} pass · ${list.length-pass.length} reject`);
     log('s',`SCAN #${S.cycle}: ${list.length} asli Solana coins (${sourcesOk}/4 sources) → ${pass.length} pass, ${list.length-pass.length} reject [${topRej}]`);
     if(!list.length){ag('scan','fail','Data nahi mila — retry');log('w','Market data nahi mila (API down/rate-limit) — WAIT, agle cycle me phir try');return}
-    if(!fresh.length){ag('rug','','koi candidate nahi');log('r','Koi naya coin filter pass nahi hua — WAIT');return}
-    // rug check top 4
-    ag('rug','work','RugCheck chal raha…');let pick=null,rc=null;
-    for(const p of fresh.slice(0,4)){const r=await rugCheck(p.baseToken.address);
-      if(r.ok){pick=p;rc=r;log('b',`RUGCHECK PASS ${p.baseToken.symbol}: score ${r.score}/100, LP lock ${isFinite(r.lp)?r.lp.toFixed(0)+'%':'?'}${r.warns.length?' · warn: '+r.warns.join(', '):''}`);break}
-      log('x',`RUGCHECK FAIL ${p.baseToken.symbol} (${short(p.baseToken.address)}): ${r.reasons.join('; ')}`);
-      S.cooldown[p.baseToken.address]=Date.now()+(r.apiErr?3:30)*60e3}
-    if(S!==sess||!S.running)return;
-    if(!pick){ag('rug','fail','Top coins risky nikle — skip');return}
-    ag('rug','ok',`${pick.baseToken.symbol} safe lagta hai`);
+    // RUG SHIELD: market-filter pass coins pehle, phir baaki (zyada volume pehle), har cycle max RS_PER_CYCLE
+    ag('rug','work','Rug Shield jaanch raha…');const rs=rsInit();
+    const others=list.filter(p=>!passSet.has(p.baseToken.address)&&!held.has(p.baseToken.address)&&!STABLE.has((p.baseToken.symbol||'').toUpperCase())&&Number(p.priceUsd)>0).sort((a,b)=>(b.volume?.h1||0)-(a.volume?.h1||0));
+    const todo=[...fresh,...others].filter(p=>rsNeedsEval(rs.recs[p.baseToken.address])).slice(0,RS_PER_CYCLE);const cnt={};
+    for(const p of todo){const r=await shieldEval(p,passSet.has(p.baseToken.address)?null:filterPair(p));cnt[r.v]=(cnt[r.v]||0)+1;
+      log(r.v==='KILL'?'x':r.v==='PASS_SMALL'?'b':'w',`SHIELD ${r.v} ${r.sym} (${short(r.mint)})${r.mkt==='pass'?' [market pass]':''}: ${r.why}`);
+      if(S!==sess||!S.running){save();return}}
+    renderShield();
+    const cs=Object.entries(cnt).map(([k,v])=>`${k} ${v}`).join(' · ')||'sab pehle se jaanche hue';
+    if(!fresh.length){ag('rug','ok',`${todo.length} jaanche · ${cs}`);log('r','Koi naya coin market filter pass nahi hua — WAIT');return}
+    const pick=fresh.find(p=>{const r=rs.recs[p.baseToken.address];return r&&r.v==='PASS_SMALL'&&Date.now()-r.ts<RS_PASS_TTL*60e3});
+    if(!pick){ag('rug','fail',`${cs} · koi PASS nahi`);log('r',`Market-pass coins (${fresh.map(p=>p.baseToken.symbol).slice(0,4).join(', ')}) me koi Shield PASS nahi — WAIT`);return}
+    const rc=rs.recs[pick.baseToken.address];
+    ag('rug','ok',`${pick.baseToken.symbol}: PASS_SMALL`);
     // sizer
     ag('size','work','Size calculate…');
     const eq=equityInr();const sizeInr=Math.floor(Math.min(eq*CFG.perCoinPct/100,S.cashInr));
@@ -302,7 +464,7 @@ async function scanCycle(){
     const plan={mint:pick.baseToken.address,pair:pick.pairAddress,sym:pick.baseToken.symbol,name:pick.baseToken.name,dex:pick.dexId,
       sizeInr,entryUsd,tpUsd,slUsd,qty,profitAtTp,lossAtSl,liq:pick.liquidity.usd,h1:pick.priceChange?.h1??0,m5:pick.priceChange?.m5??0,
       tx:pick.txns.h1,v1:pick.volume.h1,
-      reason:`1h ${pct(pick.priceChange?.h1??0,1)}, 5m ${pct(pick.priceChange?.m5??0,1)}, buys ${pick.txns.h1.buys}/sells ${pick.txns.h1.sells}, liq ${usdK(pick.liquidity.usd)}, 1h vol ${usdK(pick.volume.h1)}, RugCheck ${rc.score}/100`};
+      reason:`1h ${pct(pick.priceChange?.h1??0,1)}, 5m ${pct(pick.priceChange?.m5??0,1)}, buys ${pick.txns.h1.buys}/sells ${pick.txns.h1.sells}, liq ${usdK(pick.liquidity.usd)}, 1h vol ${usdK(pick.volume.h1)}, Shield PASS (${rc.H.n.slice(0,3).join(', ')})`};
     ag('size','ok',`${inr(sizeInr)} (${(sizeInr/eq*100).toFixed(1)}% equity)`);
     showPending(plan);
     log('s',`PLAN ${plan.sym}: lagana ${inr(sizeInr)} · Entry ${inrPrice(entryUsd*fx())} · TP ${inrPrice(tpUsd*fx())} (+${CFG.tpPct}% → ${inr(profitAtTp,2)}) · SL ${inrPrice(slUsd*fx())} (-${CFG.slPct}% → ${inr(lossAtSl,2)})`);
@@ -417,7 +579,7 @@ function renderEq(){const cv=$('eq');const dpr=window.devicePixelRatio||1;const 
   pts.forEach((p,i)=>{i?x.lineTo(X(p[0]),Y(p[1])):x.moveTo(X(p[0]),Y(p[1]))});x.stroke();
   x.fillStyle='#7c8696';x.fillText(hhmm(t0).slice(0,5),L,H-4);x.textAlign='right';x.fillText(hhmm(t1).slice(0,5),W-R,H-4);x.textAlign='left'}
 
-function render(){renderTop();renderPositions();renderStats();renderTrace();renderClosed();renderEq();renderPipe()}
+function render(){renderTop();renderPositions();renderStats();renderTrace();renderClosed();renderEq();renderPipe();renderShield()}
 
 // ====================== CONTROLS ======================
 let tPx=null,tScan=null;
@@ -428,20 +590,22 @@ $('startBtn').onclick=()=>{if(S.running){S.sessionMs+=Date.now()-S.lastStart;S.r
   save();render()};
 $('resetBtn').onclick=()=>{const v=Math.round(Number($('startBalIn').value));if(!(v>=100)){alert('Kam se kam ₹100 rakhiye');return}
   if(!confirm(`Naya session ₹${v.toLocaleString('en-IN')} se shuru karein? Purana demo hisaab mit jayega.`))return;
-  stopLoops();const fxs=S.fx;S=fresh(v);S.fx=fxs;log('s',`RESET — naya demo balance ${inr(v)}`);save();render()};
+  stopLoops();const fxs=S.fx,rss=S.rs;S=fresh(v);S.fx=fxs;S.rs=rss;log('s',`RESET — naya demo balance ${inr(v)}`);save();render()};
 $('clearLog').onclick=()=>{S.log=[];renderLog();save()};
 $('startBalIn').value=S.startInr;
-$('rules').innerHTML=`<b>Rules (sab fixed, hidden kuch nahi):</b><br>Scanner: Solana coins DexScreener boosts/profiles + GeckoTerminal trending se · liquidity ≥ ${usdK(CFG.minLiqUsd)} · 24h vol ≥ ${usdK(CFG.minVol24Usd)} · 1h vol ≥ ${usdK(CFG.minVol1hUsd)} · ≥ ${CFG.minTxns1h} txns/1h · umar ≥ ${CFG.minAgeMin} min · mcap ≤ ${usdK(CFG.maxFdvUsd)} · 1h change ${CFG.minH1Pct}% se +${CFG.maxH1Pct}% · 5m ≥ ${CFG.minM5Pct}% · buys/sells ≥ ${CFG.minBuyRatio}<br>Rug Check (RugCheck.xyz): freeze/mint authority ON = reject · koi bhi "danger" risk (top holders, low liquidity, rugger creator…) = reject · LP lock ≥ ${CFG.minLpLockedPct}% · score ≤ ${CFG.maxRugScore}/100<br>Sizer: max ${CFG.perCoinPct}% equity per coin · max ${CFG.maxOpen} khule trades<br>Executor: live DexScreener price par paper fill · ${CFG.costPct}% cost har side · price 3% se zyada bhaag jaye to skip<br>Exit: TP +${CFG.tpPct}% · SL -${CFG.slPct}% · ${CFG.maxHoldMin} min time-stop · liquidity aadhi ho jaye to exit · price har 15 sec check`;
+$('rules').innerHTML=`<b>Rules (sab fixed, hidden kuch nahi):</b><br>Scanner: Solana coins DexScreener boosts/profiles + GeckoTerminal trending se · liquidity ≥ ${usdK(CFG.minLiqUsd)} · 24h vol ≥ ${usdK(CFG.minVol24Usd)} · 1h vol ≥ ${usdK(CFG.minVol1hUsd)} · ≥ ${CFG.minTxns1h} txns/1h · umar ≥ ${CFG.minAgeMin} min · mcap ≤ ${usdK(CFG.maxFdvUsd)} · 1h change ${CFG.minH1Pct}% se +${CFG.maxH1Pct}% · 5m ≥ ${CFG.minM5Pct}% · buys/sells ≥ ${CFG.minBuyRatio}<br>Rug Shield (RugCheck.xyz full report + DexScreener): KILL agar mint/freeze authority ON, LP lock/burn < ${RS.minLpLockedPct}% (PumpSwap LP burned = theek), top 10 holders (pool ke bina) > ${RS.maxTop10Pct}%, dev > ${RS.maxDevPct}%, liquidity < ${usdK(RS.minLiqUsd)}, pair < ${RS.minAgeMin} min, insider/bundle > ${RS.maxInsiderPct}%, dev ka rug history · phir HOLDERS + HYPE alag jaanch · dono saaf = PASS (trade), ek me shak = WATCH (10 min baad dobara), dono me shak ya data na mile = HUMAN (aapki nazar, auto-buy nahi) · RugCheck danger risk ya score > ${CFG.maxRugScore}/100 = HOLDERS shak<br>Sizer: max ${CFG.perCoinPct}% equity per coin · max ${CFG.maxOpen} khule trades<br>Executor: live DexScreener price par paper fill · ${CFG.costPct}% cost har side · price 3% se zyada bhaag jaye to skip<br>Exit: TP +${CFG.tpPct}% · SL -${CFG.slPct}% · ${CFG.maxHoldMin} min time-stop · liquidity aadhi ho jaye to exit · price har 15 sec check`;
 
 // tick UI timer
 setInterval(()=>{renderTop()},1000);
+setInterval(followUps,60e3);
 window.addEventListener('resize',renderEq);
-(async()=>{render();renderLog();await loadFx(true);
+rsInit();renderRsCfg();
+(async()=>{render();renderLog();await loadFx(true);followUps();
   if(S.running){if(S.lastStart&&S.savedAt>S.lastStart)S.sessionMs+=S.savedAt-S.lastStart;S.lastStart=Date.now();log('w','Tab dobara khula — bot phir chalu. Jab tab band tha tab ke price moves miss hue (honest note).');startLoops()}
   else if(/[?&]autostart=1/.test(location.search)){$('startBtn').click()}
   render()})();
 if(QA)$('qaBadge').style.display='inline-block';
-window.__nd={S:()=>S,CFG,QA};
+window.__nd={S:()=>S,CFG,QA,RS,FU};
 </script>
 </body>
 </html>

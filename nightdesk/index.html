@@ -100,7 +100,7 @@ details summary{cursor:pointer;color:var(--mut);font-size:12px}
   <div class="card">
     <h3>Equity Curve <span class="pill">log scale · asli</span></h3>
     <canvas id="eq" height="170"></canvas>
-    <div class="mut" style="font-size:11px;margin-top:4px">Har 15 sec ka asli mark-to-market (fees ke baad). Kuch bhi edit nahi kiya.</div>
+    <div class="mut" style="font-size:11px;margin-top:4px">Har price-check ka asli mark-to-market (fees ke baad). Kuch bhi edit nahi kiya.</div>
   </div>
 
   <div class="card">
@@ -129,6 +129,7 @@ details summary{cursor:pointer;color:var(--mut);font-size:12px}
   <div class="card">
     <h3>Settings</h3>
     <div class="row sub">Shuru ka demo balance ₹ <input class="num" id="startBalIn" type="number" min="100" step="100" value="5000"> <button class="btn sm" id="resetBtn">Reset (naya session)</button></div>
+    <details style="margin-top:8px"><summary>⚙️ Trading settings (TP / SL / size / entry)</summary><div class="mut" style="font-size:11px;margin:6px 0">Defaults 24 Nov ke backtest se: 3 din, 54 asli coins. Pichhle setting (TP 25 / SL 12 / 10%) ne backtest me paisa ganwaya tha. Naya setting bhi guarantee nahi hai.</div><div id="cfgEdit"></div></details>
     <div class="foot" style="margin-top:8px" id="rules"></div>
   </div>
 
@@ -142,11 +143,12 @@ details summary{cursor:pointer;color:var(--mut);font-size:12px}
 'use strict';
 // ====================== CONFIG ======================
 const CFG = {
-  perCoinPct: 10,        // max 10% of equity per coin
+  perCoinPct: 5,         // max 5% of equity per coin (backtest 24 Nov: kam drawdown)
   maxOpen: 4,
   tpPct: 25,             // take profit +25%
-  slPct: 12,             // stop loss -12%
-  maxHoldMin: 45,        // time stop
+  pullbackPct: 5,        // entry sirf jab price 15-min high se ≥5% neeche ho aur pichhla 1-min candle upar band hua ho (0 = off)
+  slPct: 30,             // stop loss -30% (backtest: -12% baar-baar noise me kat raha tha)
+  maxHoldMin: 45,        // time stop (0 = koi time-stop nahi)
   costPct: 1.0,          // fee + slippage per side
   minLiqUsd: 15000,
   minVol24Usd: 50000,
@@ -157,17 +159,20 @@ const CFG = {
   maxH1Pct: 150,
   minH1Pct: -5,
   minM5Pct: -3,
-  minBuyRatio: 1.05,
+  minBuyRatio: 0,        // 0 = off (backtest me test nahi ho saka; pullback ke time sellers zyada hote hain)
   minLpLockedPct: 50,
   maxRugScore: 50,
   priceEveryMs: 15000,
   scanEveryMs: 60000,
   cooldownMin: 120,
 };
+const CFG_DEF={...CFG};const CFG_EDIT=[['perCoinPct','Har coin me max % (equity)',1,25],['maxOpen','Max khule trades',1,8],['tpPct','Take profit +%',2,200],['slPct','Stop loss -%',2,60],['maxHoldMin','Time-stop min (0 = nahi)',0,1440],['priceEveryMs','Price check (ms, 5000-60000)',5000,60000],['pullbackPct','Pullback entry % (0 = off)',0,30],['minLiqUsd','Min liquidity $',1000,1e7],['maxH1Pct','1h me max +% (late entry rok)',5,1000],['minM5Pct','5m change kam se kam %',-50,50],['minBuyRatio','Buy/sell 1h kam se kam (0 = off)',0,5]];
+const CFG_KEY=(new URLSearchParams(location.search).get('qa')==='1')?'nightdesk.qa.cfg':'nightdesk.cfg';
+try{const o=JSON.parse(localStorage.getItem(CFG_KEY)||'{}');for(const [k,,lo,hi] of CFG_EDIT){const v=Number(o[k]);if(o[k]!==undefined&&o[k]!==''&&isFinite(v)&&v>=lo&&v<=hi)CFG[k]=v}}catch(e){}
 // Test-only QA mode: ?qa=1&hold=3&tp=5&sl=3 → alag storage key, defaults unchanged
 const QP=new URLSearchParams(location.search);const QA=QP.get('qa')==='1';
 if(QA){const n=(k,lo,hi)=>{const v=Number(QP.get(k));return v>=lo&&v<=hi?v:null};
-  const h=n('hold',1,45),tp=n('tp',1,25),sl=n('sl',1,12);if(h)CFG.maxHoldMin=h;if(tp)CFG.tpPct=tp;if(sl)CFG.slPct=sl}
+  const h=n('hold',1,1440),tp=n('tp',1,200),sl=n('sl',1,60);if(h)CFG.maxHoldMin=h;if(tp)CFG.tpPct=tp;if(sl)CFG.slPct=sl}
 const KEY = QA?'nightdesk.qa':'nightdesk.v1';
 const STABLE = new Set(['SOL','WSOL','USDC','USDT','USD1','PYUSD','JUP','JITOSOL','MSOL','BSOL','JLP','RAY','PUMP','WETH','WBTC','CBBTC','HSOL','JUPSOL','INF','BNSOL']);
 // ====================== STATE ======================
@@ -394,6 +399,24 @@ function renderRsCfg(){const f=[['maxTop10Pct','Top 10 holders max %'],['maxDevP
   $('rsDef').onclick=()=>{Object.assign(RS,RS_DEF);localStorage.removeItem(RS_KEY);log('s','Rug Shield limits default par');renderRsCfg()};
   $('rsClear').onclick=()=>{if(!confirm('Rug Shield ka saara hisaab (faisle aur follow-up) mita dein?'))return;S.rs={recs:{},since:Date.now()};save();renderShield()}}
 
+// ====================== PULLBACK ENTRY (backtest 24 Nov) ======================
+// GeckoTerminal 1-min candles: pichhle 15 poore minute ka high; entry tabhi jab aakhri close us high se >= pullbackPct% neeche ho aur aakhri candle pichhle se upar band hua ho (bounce)
+async function pullbackCheck(pair){
+  try{const j=await getJ(`https://api.geckoterminal.com/api/v2/networks/solana/pools/${pair}/ohlcv/minute?aggregate=1&limit=30&currency=usd&token=base`,10000);
+    const nowMin=Math.floor(Date.now()/60000)*60;const L=((j&&j.data&&j.data.attributes&&j.data.attributes.ohlcv_list)||[]).filter(r=>r[0]<nowMin).sort((a,b)=>a[0]-b[0]);
+    if(L.length<2)return {ok:false,note:'1-min candles nahi mile'};
+    const last=L[L.length-1],prev=L[L.length-2];const win=L.filter(r=>r[0]>=nowMin-15*60);
+    const hi=Math.max(...(win.length?win:[last]).map(r=>r[2]));const c1=last[4];const dd=(1-c1/hi)*100;
+    const bounce=last[0]===nowMin-60?c1>prev[4]:false;
+    if(dd<CFG.pullbackPct)return {ok:false,note:`15-min high se sirf ${dd.toFixed(1)}% neeche (chahiye ≥${CFG.pullbackPct}%)`};
+    if(!bounce)return {ok:false,note:`${dd.toFixed(1)}% neeche hai par abhi bounce nahi (aakhri minute upar band nahi hua)`};
+    return {ok:true,note:`pullback ${dd.toFixed(1)}% + bounce`}}
+  catch(e){return {ok:false,note:'candle data nahi mila ('+e.message+') — skip'}}}
+function renderCfg(){$('cfgEdit').innerHTML=CFG_EDIT.map(([k,l])=>`<label class="rsi"><span>${l} <span class="mut" style="font-size:10.5px">(default ${CFG_DEF[k]})</span></span><input class="num" type="number" step="any" id="cf_${k}" value="${CFG[k]}"></label>`).join('')+
+  `<div class="row" style="margin-top:6px"><button class="btn sm" id="cfSave">Save</button><button class="btn sm" id="cfDef">Default (backtest wali)</button></div><div class="mut" style="font-size:11px;margin-top:4px">Naye trades par lagu. Price-check speed Stop/Start ke baad badlegi.</div>`;
+  $('cfSave').onclick=()=>{const o={};const bad=[];for(const [k,l,lo,hi] of CFG_EDIT){const v=Number($('cf_'+k).value);if(isFinite(v)&&v>=lo&&v<=hi){CFG[k]=v;o[k]=v}else bad.push(`${l} (${lo}–${hi})`)}
+    localStorage.setItem(CFG_KEY,JSON.stringify(o));log('s','Trading settings save: TP +'+CFG.tpPct+'%, SL -'+CFG.slPct+'%, time-stop '+(CFG.maxHoldMin||'nahi')+', size '+CFG.perCoinPct+'%, pullback '+CFG.pullbackPct+'%'+(bad.length?' · galat value chhodi: '+bad.join(', '):''));renderCfg();renderRules();render()};
+  $('cfDef').onclick=()=>{for(const [k] of CFG_EDIT)CFG[k]=CFG_DEF[k];localStorage.removeItem(CFG_KEY);log('s','Trading settings default (backtest wali) par');renderCfg();renderRules();render()}}
 // ====================== SCANNER FILTER ======================
 function filterPair(p){
   const sym=(p.baseToken.symbol||'').toUpperCase();
@@ -449,7 +472,14 @@ async function scanCycle(){
     renderShield();
     const cs=Object.entries(cnt).map(([k,v])=>`${k} ${v}`).join(' · ')||'sab pehle se jaanche hue';
     if(!fresh.length){ag('rug','ok',`${todo.length} jaanche · ${cs}`);log('r','Koi naya coin market filter pass nahi hua — WAIT');return}
-    const pick=fresh.find(p=>{const r=rs.recs[p.baseToken.address];return r&&r.v==='PASS_SMALL'&&Date.now()-r.ts<RS_PASS_TTL*60e3});
+    const okList=fresh.filter(p=>{const r=rs.recs[p.baseToken.address];return r&&r.v==='PASS_SMALL'&&Date.now()-r.ts<RS_PASS_TTL*60e3});
+    let pick=null,pbNote='';
+    for(const p of okList.slice(0,3)){
+      if(!(CFG.pullbackPct>0)){pick=p;break}
+      const pb=await pullbackCheck(p.pairAddress);if(S!==sess||!S.running)return;
+      if(pb.ok){pick=p;pbNote=pb.note;log('b',`PULLBACK OK ${p.baseToken.symbol}: ${pb.note}`);break}
+      log('r',`WAIT ${p.baseToken.symbol} (Shield PASS): ${pb.note}`)}
+    if(!pick&&okList.length){ag('rug','ok',`${okList.length} PASS · pullback ka intezaar`);return}
     if(!pick){ag('rug','fail',`${cs} · koi PASS nahi`);log('r',`Market-pass coins (${fresh.map(p=>p.baseToken.symbol).slice(0,4).join(', ')}) me koi Shield PASS nahi — WAIT`);return}
     const rc=rs.recs[pick.baseToken.address];
     ag('rug','ok',`${pick.baseToken.symbol}: PASS_SMALL`);
@@ -464,7 +494,7 @@ async function scanCycle(){
     const plan={mint:pick.baseToken.address,pair:pick.pairAddress,sym:pick.baseToken.symbol,name:pick.baseToken.name,dex:pick.dexId,
       sizeInr,entryUsd,tpUsd,slUsd,qty,profitAtTp,lossAtSl,liq:pick.liquidity.usd,h1:pick.priceChange?.h1??0,m5:pick.priceChange?.m5??0,
       tx:pick.txns.h1,v1:pick.volume.h1,
-      reason:`1h ${pct(pick.priceChange?.h1??0,1)}, 5m ${pct(pick.priceChange?.m5??0,1)}, buys ${pick.txns.h1.buys}/sells ${pick.txns.h1.sells}, liq ${usdK(pick.liquidity.usd)}, 1h vol ${usdK(pick.volume.h1)}, Shield PASS (${rc.H.n.slice(0,3).join(', ')})`};
+      reason:`1h ${pct(pick.priceChange?.h1??0,1)}, 5m ${pct(pick.priceChange?.m5??0,1)}, buys ${pick.txns.h1.buys}/sells ${pick.txns.h1.sells}, liq ${usdK(pick.liquidity.usd)}, 1h vol ${usdK(pick.volume.h1)}, Shield PASS (${rc.H.n.slice(0,3).join(', ')})${pbNote?', '+pbNote:''}`};
     ag('size','ok',`${inr(sizeInr)} (${(sizeInr/eq*100).toFixed(1)}% equity)`);
     showPending(plan);
     log('s',`PLAN ${plan.sym}: lagana ${inr(sizeInr)} · Entry ${inrPrice(entryUsd*fx())} · TP ${inrPrice(tpUsd*fx())} (+${CFG.tpPct}% → ${inr(profitAtTp,2)}) · SL ${inrPrice(slUsd*fx())} (-${CFG.slPct}% → ${inr(lossAtSl,2)})`);
@@ -500,7 +530,7 @@ async function priceCycle(){
         let trig=null;
         if(u>=p.tpUsd)trig=['TP','Take-profit hit (+'+CFG.tpPct+'% target)'];
         else if(u<=p.slUsd)trig=['SL','Stop-loss hit (-'+CFG.slPct+'%)'];
-        else if(held>=CFG.maxHoldMin)trig=['TIME',`${CFG.maxHoldMin} min ho gaye, time-stop`];
+        else if(CFG.maxHoldMin>0&&held>=CFG.maxHoldMin)trig=['TIME',`${CFG.maxHoldMin} min ho gaye, time-stop`];
         else if(d.liquidity&&d.liquidity.usd>0&&d.liquidity.usd<(p.liqAtEntry||CFG.minLiqUsd)*0.5)trig=['LIQ',`Liquidity aadhi se kam (${usdK(p.liqAtEntry||CFG.minLiqUsd)} → ${usdK(d.liquidity.usd)}) — bahar nikle`];
         if(trig)closePos(p,u,exitUsd,trig)}
     }
@@ -532,7 +562,7 @@ function renderTop(){const e=equityInr();const pnl=e-S.startInr;
   $('cashline').textContent=`Cash ${inr(S.cashInr,2)} · Open trades ${fx()?inr(openValueInr(),2):'₹—'}`;
   $('fxline').textContent=S.fx.rate?`USD→INR ${S.fx.rate.toFixed(2)} (${S.fx.src}, ${hhmm(S.fx.ts)} IST)`:'USD→INR: loading…';
   $('startBtn').textContent=S.running?'■ Stop':'▶ Start';$('startBtn').className='btn '+(S.running?'stop':'go');
-  $('status').textContent=S.running?'Chal raha hai · har 60s scan, har 15s price':'Ruka hua hai (stopped)';
+  $('status').textContent=S.running?`Chal raha hai · har 60s scan, har ${CFG.priceEveryMs/1000}s price`:'Ruka hua hai (stopped)';
   $('cycle').textContent='cycle '+S.cycle;
   const ms=S.sessionMs+(S.running&&S.lastStart?Date.now()-S.lastStart:0);$('timer').textContent='⏱ '+dur(ms)}
 
@@ -540,7 +570,7 @@ function renderPositions(){$('opencnt').textContent=S.positions.length;const r=f
   if(!S.positions.length){$('positions').innerHTML='<span class="mut">Abhi koi trade khula nahi hai.</span>';return}
   $('positions').innerHTML=S.positions.map(p=>{const val=p.qty*p.lastUsd*(r||p.fxAtEntry)*(1-CFG.costPct/100);const pnl=val-p.costInr;const pc=pnl/p.costInr*100;
     return `<div class="pos"><div class="top"><b>${esc(p.sym)}</b><span class="mono ${pnl>=0?'up':'dn'}">${pnl>=0?'+':''}${inr(pnl,2)} (${pct(pc,1)})</span></div>
-    <div class="mono mut" style="font-size:12px">Lagaya ${inr(p.costInr)} · Entry ${inrPrice(p.entryUsd*r)} · Ab ${inrPrice(p.lastUsd*r)}<br>TP <span class="up">${inrPrice(p.tpUsd*r)}</span> · SL <span class="dn">${inrPrice(p.slUsd*r)}</span> · ${Math.floor((Date.now()-p.openTs)/60e3)}/${CFG.maxHoldMin} min</div>
+    <div class="mono mut" style="font-size:12px">Lagaya ${inr(p.costInr)} · Entry ${inrPrice(p.entryUsd*r)} · Ab ${inrPrice(p.lastUsd*r)}<br>TP <span class="up">${inrPrice(p.tpUsd*r)}</span> · SL <span class="dn">${inrPrice(p.slUsd*r)}</span> · ${Math.floor((Date.now()-p.openTs)/60e3)}/${CFG.maxHoldMin||'∞'} min</div>
     <div style="font-size:12px">${links(p)}</div></div>`}).join('')}
 
 function renderStats(){const c=S.closed;const w=c.filter(x=>x.pnlInr>0).length,l=c.length-w;const wr=c.length?w/c.length*100:null;
@@ -586,14 +616,15 @@ let tPx=null,tScan=null;
 function startLoops(){clearInterval(tPx);clearInterval(tScan);tPx=setInterval(priceCycle,CFG.priceEveryMs);tScan=setInterval(scanCycle,CFG.scanEveryMs);setTimeout(()=>{priceCycle();scanCycle()},300)}
 function stopLoops(){clearInterval(tPx);clearInterval(tScan)}
 $('startBtn').onclick=()=>{if(S.running){S.sessionMs+=Date.now()-S.lastStart;S.running=false;stopLoops();log('w','STOP — Vivaan जी ne bot roka. Khule trades ka price update bhi ruk gaya.');hidePending();AG.forEach(a=>agState[a[0]]={st:'',txt:'ruka hua'})}
-  else{S.running=true;S.lastStart=Date.now();log('s','START — Night Desk chalu (paper/demo). Rules: max '+CFG.perCoinPct+'% per coin, TP +'+CFG.tpPct+'%, SL -'+CFG.slPct+'%, time-stop '+CFG.maxHoldMin+' min.');startLoops()}
+  else{S.running=true;S.lastStart=Date.now();log('s','START — Night Desk chalu (paper/demo). Rules: max '+CFG.perCoinPct+'% per coin, TP +'+CFG.tpPct+'%, SL -'+CFG.slPct+'%, time-stop '+(CFG.maxHoldMin>0?CFG.maxHoldMin+' min':'nahi')+', pullback entry '+(CFG.pullbackPct>0?CFG.pullbackPct+'%':'off')+', price har '+CFG.priceEveryMs/1000+'s.');startLoops()}
   save();render()};
 $('resetBtn').onclick=()=>{const v=Math.round(Number($('startBalIn').value));if(!(v>=100)){alert('Kam se kam ₹100 rakhiye');return}
   if(!confirm(`Naya session ₹${v.toLocaleString('en-IN')} se shuru karein? Purana demo hisaab mit jayega.`))return;
   stopLoops();const fxs=S.fx,rss=S.rs;S=fresh(v);S.fx=fxs;S.rs=rss;log('s',`RESET — naya demo balance ${inr(v)}`);save();render()};
 $('clearLog').onclick=()=>{S.log=[];renderLog();save()};
 $('startBalIn').value=S.startInr;
-$('rules').innerHTML=`<b>Rules (sab fixed, hidden kuch nahi):</b><br>Scanner: Solana coins DexScreener boosts/profiles + GeckoTerminal trending se · liquidity ≥ ${usdK(CFG.minLiqUsd)} · 24h vol ≥ ${usdK(CFG.minVol24Usd)} · 1h vol ≥ ${usdK(CFG.minVol1hUsd)} · ≥ ${CFG.minTxns1h} txns/1h · umar ≥ ${CFG.minAgeMin} min · mcap ≤ ${usdK(CFG.maxFdvUsd)} · 1h change ${CFG.minH1Pct}% se +${CFG.maxH1Pct}% · 5m ≥ ${CFG.minM5Pct}% · buys/sells ≥ ${CFG.minBuyRatio}<br>Rug Shield (RugCheck.xyz full report + DexScreener): KILL agar mint/freeze authority ON, LP lock/burn < ${RS.minLpLockedPct}% (PumpSwap LP burned = theek), top 10 holders (pool ke bina) > ${RS.maxTop10Pct}%, dev > ${RS.maxDevPct}%, liquidity < ${usdK(RS.minLiqUsd)}, pair < ${RS.minAgeMin} min, insider/bundle > ${RS.maxInsiderPct}%, dev ka rug history · phir HOLDERS + HYPE alag jaanch · dono saaf = PASS (trade), ek me shak = WATCH (10 min baad dobara), dono me shak ya data na mile = HUMAN (aapki nazar, auto-buy nahi) · RugCheck danger risk ya score > ${CFG.maxRugScore}/100 = HOLDERS shak<br>Sizer: max ${CFG.perCoinPct}% equity per coin · max ${CFG.maxOpen} khule trades<br>Executor: live DexScreener price par paper fill · ${CFG.costPct}% cost har side · price 3% se zyada bhaag jaye to skip<br>Exit: TP +${CFG.tpPct}% · SL -${CFG.slPct}% · ${CFG.maxHoldMin} min time-stop · liquidity aadhi ho jaye to exit · price har 15 sec check`;
+function renderRules(){$('rules').innerHTML=`<b>Rules (hidden kuch nahi):</b><br>Scanner: Solana coins DexScreener boosts/profiles + GeckoTerminal trending se · liquidity ≥ ${usdK(CFG.minLiqUsd)} · 24h vol ≥ ${usdK(CFG.minVol24Usd)} · 1h vol ≥ ${usdK(CFG.minVol1hUsd)} · ≥ ${CFG.minTxns1h} txns/1h · umar ≥ ${CFG.minAgeMin} min · mcap ≤ ${usdK(CFG.maxFdvUsd)} · 1h change ${CFG.minH1Pct}% se +${CFG.maxH1Pct}% · 5m ≥ ${CFG.minM5Pct}% · buys/sells ≥ ${CFG.minBuyRatio||'off'} · entry: ${CFG.pullbackPct>0?`15-min high se ≥${CFG.pullbackPct}% pullback + bounce (GeckoTerminal 1-min candles)`:'pullback off'}<br>Rug Shield (RugCheck.xyz full report + DexScreener): KILL agar mint/freeze authority ON, LP lock/burn < ${RS.minLpLockedPct}% (PumpSwap LP burned = theek), top 10 holders (pool ke bina) > ${RS.maxTop10Pct}%, dev > ${RS.maxDevPct}%, liquidity < ${usdK(RS.minLiqUsd)}, pair < ${RS.minAgeMin} min, insider/bundle > ${RS.maxInsiderPct}%, dev ka rug history · phir HOLDERS + HYPE alag jaanch · dono saaf = PASS (trade), ek me shak = WATCH (10 min baad dobara), dono me shak ya data na mile = HUMAN (aapki nazar, auto-buy nahi) · RugCheck danger risk ya score > ${CFG.maxRugScore}/100 = HOLDERS shak<br>Sizer: max ${CFG.perCoinPct}% equity per coin · max ${CFG.maxOpen} khule trades<br>Executor: live DexScreener price par paper fill · ${CFG.costPct}% cost har side · price 3% se zyada bhaag jaye to skip<br>Exit: TP +${CFG.tpPct}% · SL -${CFG.slPct}% · ${CFG.maxHoldMin>0?CFG.maxHoldMin+' min time-stop':'time-stop nahi'} · liquidity aadhi ho jaye to exit · price har ${CFG.priceEveryMs/1000} sec check`}
+renderRules();renderCfg();
 
 // tick UI timer
 setInterval(()=>{renderTop()},1000);

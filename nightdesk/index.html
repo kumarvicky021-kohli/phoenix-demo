@@ -168,6 +168,9 @@ const CFG = {
 };
 const CFG_DEF={...CFG};const CFG_EDIT=[['perCoinPct','Har coin me max % (equity)',1,25],['maxOpen','Max khule trades',1,8],['tpPct','Take profit +%',2,200],['slPct','Stop loss -%',2,60],['maxHoldMin','Time-stop min (0 = nahi)',0,1440],['priceEveryMs','Price check (ms, 5000-60000)',5000,60000],['pullbackPct','Pullback entry % (0 = off)',0,30],['minLiqUsd','Min liquidity $',1000,1e7],['maxH1Pct','1h me max +% (late entry rok)',5,1000],['minM5Pct','5m change kam se kam %',-50,50],['minBuyRatio','Buy/sell 1h kam se kam (0 = off)',0,5]];
 const CFG_KEY=(new URLSearchParams(location.search).get('qa')==='1')?'nightdesk.qa.cfg':'nightdesk.cfg';
+// Settings schema version: purane saved trading settings ek baar naye backtest defaults par switch
+const CFG_SCHEMA=2,CFG_VER_KEY=CFG_KEY+'.ver';let CFG_MIGRATED=false;
+try{if(!(Number(localStorage.getItem(CFG_VER_KEY))>=CFG_SCHEMA)){CFG_MIGRATED=localStorage.getItem(CFG_KEY)!==null||localStorage.getItem(CFG_KEY.replace('.cfg','.v1'))!==null||localStorage.getItem('nightdesk.v1')!==null;localStorage.removeItem(CFG_KEY);localStorage.setItem(CFG_VER_KEY,String(CFG_SCHEMA))}}catch(e){}
 try{const o=JSON.parse(localStorage.getItem(CFG_KEY)||'{}');for(const [k,,lo,hi] of CFG_EDIT){const v=Number(o[k]);if(o[k]!==undefined&&o[k]!==''&&isFinite(v)&&v>=lo&&v<=hi)CFG[k]=v}}catch(e){}
 // Test-only QA mode: ?qa=1&hold=3&tp=5&sl=3 → alag storage key, defaults unchanged
 const QP=new URLSearchParams(location.search);const QA=QP.get('qa')==='1';
@@ -302,7 +305,7 @@ async function shieldEval(p,mkt){
     else{F.dev=Number(j.creatorBalance||0)/supply*100;if(F.dev>RS.maxDevPct)K('dev',`Dev ke paas ${fx2(F.dev,RS.maxDevPct)}% supply > ${RS.maxDevPct}%`)}
     const nets=Array.isArray(j.insiderNetworks)?j.insiderNetworks:[];F.insN=Number(j.graphInsidersDetected)||0;
     if(F.insN>0&&!nets.length||!(supply>0))U('ins','Insider wallets ka % nahi nikla');
-    else{F.ins=nets.reduce((s,x)=>s+(Number(x.currentHolding)||0),0)/supply*100;if(F.ins>RS.maxInsiderPct)K('ins',`Insider/bundle wallets (${F.insN}) ke paas ${fx2(F.ins,RS.maxInsiderPct)}% > ${RS.maxInsiderPct}%`)}
+    else{F.ins=Math.min(100,nets.reduce((s,x)=>s+(Number(x.currentHolding)||0),0)/supply*100);if(F.ins>RS.maxInsiderPct)K('ins',`Insider/bundle wallets (${F.insN}) ke paas ${fx2(F.ins,RS.maxInsiderPct)}% > ${RS.maxInsiderPct}%`)}
     F.risks=(j.risks||[]).map(r=>({n:r.name,l:r.level}));
     if(F.risks.some(r=>/creator history of rugged/i.test(r.n)))K('creator','Is coin ka dev pehle bhi rug kar chuka hai (RugCheck history)');
     F.ctok=Array.isArray(j.creatorTokens)?j.creatorTokens.length:0;F.holders=Number(j.totalHolders)||null;F.score=j.score_normalised;
@@ -631,6 +634,7 @@ setInterval(()=>{renderTop()},1000);
 setInterval(followUps,60e3);
 window.addEventListener('resize',renderEq);
 rsInit();renderRsCfg();
+if(CFG_MIGRATED){log('s',`Settings update: naye defaults lagu — TP +${CFG.tpPct}%, SL -${CFG.slPct}%, time-stop ${CFG.maxHoldMin} min, size ${CFG.perCoinPct}%, pullback ${CFG.pullbackPct}%. Balance aur trade history waise hi hain. Pehle se khule trades apne purane TP/SL par chalenge.`);save()}
 (async()=>{render();renderLog();await loadFx(true);followUps();
   if(S.running){if(S.lastStart&&S.savedAt>S.lastStart)S.sessionMs+=S.savedAt-S.lastStart;S.lastStart=Date.now();log('w','Tab dobara khula — bot phir chalu. Jab tab band tha tab ke price moves miss hue (honest note).');startLoops()}
   else if(/[?&]autostart=1/.test(location.search)){$('startBtn').click()}

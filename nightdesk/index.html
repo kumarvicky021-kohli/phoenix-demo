@@ -63,6 +63,11 @@ details summary{cursor:pointer;color:var(--mut);font-size:12px}
     <div class="brand">🌙 Night Desk <span class="mut" style="font-weight:500;font-size:12px">6-Agent</span></div>
     <span class="demo">DEMO PAISA · असली पैसा नहीं</span><span class="demo" id="qaBadge" style="display:none;background:#102a4a;color:#9cc3ff;border-color:#2d4a8a">QA TEST MODE</span>
   </div>
+  <div class="card" id="pauseBanner" style="margin-top:8px;background:#3a2a00;border-color:#6b4e00">
+    <div id="pauseBannerText" style="font-weight:800;color:#ffd27a">Auto trading 27 Nov tak band hai (Vivaan जी ke kehne par). Sirf scan aur Rug Shield chal rahe hain.</div>
+    <div class="mut" id="pauseBannerSub" style="font-size:12px;margin-top:6px">Pehle se khule demo trades apne TP/SL/time-stop par chalenge. Nayi automatic kharidari nahi hogi.</div>
+    <div class="row" style="margin-top:8px"><button class="btn sm" id="resumeBtn">Resume auto trading (demo)</button></div>
+  </div>
   <div class="card" style="margin-top:8px">
     <div class="top"><span class="mut sub">Namaste Vivaan जी 🙏 · Total Balance (demo)</span><span class="timer mono" id="timer">⏱ 00:00:00</span></div>
     <div class="bal mono" id="bal">₹5,000</div>
@@ -168,10 +173,25 @@ const CFG = {
 };
 const CFG_DEF={...CFG};const CFG_EDIT=[['perCoinPct','Har coin me max % (equity)',1,25],['maxOpen','Max khule trades',1,8],['tpPct','Take profit +%',2,200],['slPct','Stop loss -%',2,60],['maxHoldMin','Time-stop min (0 = nahi)',0,1440],['priceEveryMs','Price check (ms, 5000-60000)',5000,60000],['pullbackPct','Pullback entry % (0 = off)',0,30],['minLiqUsd','Min liquidity $',1000,1e7],['maxH1Pct','1h me max +% (late entry rok)',5,1000],['minM5Pct','5m change kam se kam %',-50,50],['minBuyRatio','Buy/sell 1h kam se kam (0 = off)',0,5]];
 const CFG_KEY=(new URLSearchParams(location.search).get('qa')==='1')?'nightdesk.qa.cfg':'nightdesk.cfg';
-// Settings schema version: purane saved trading settings ek baar naye backtest defaults par switch
-const CFG_SCHEMA=2,CFG_VER_KEY=CFG_KEY+'.ver';let CFG_MIGRATED=false;
-try{if(!(Number(localStorage.getItem(CFG_VER_KEY))>=CFG_SCHEMA)){CFG_MIGRATED=localStorage.getItem(CFG_KEY)!==null||localStorage.getItem(CFG_KEY.replace('.cfg','.v1'))!==null||localStorage.getItem('nightdesk.v1')!==null;localStorage.removeItem(CFG_KEY);localStorage.setItem(CFG_VER_KEY,String(CFG_SCHEMA))}}catch(e){}
+// Settings schema version: v2 = backtest defaults; v3 = auto-trading pause (trading values unchanged)
+const AUTO_TRADING_PAUSED=true;
+const CFG_SCHEMA=3,CFG_VER_KEY=CFG_KEY+'.ver',PAUSE_KEY=CFG_KEY+'.autopaused';
+let CFG_MIGRATED=false,PAUSE_MIGRATED=false;
+try{
+  const ver=Number(localStorage.getItem(CFG_VER_KEY));
+  if(!(ver>=CFG_SCHEMA)){
+    if(!(ver>=2)){
+      CFG_MIGRATED=localStorage.getItem(CFG_KEY)!==null||localStorage.getItem(CFG_KEY.replace('.cfg','.v1'))!==null||localStorage.getItem('nightdesk.v1')!==null;
+      localStorage.removeItem(CFG_KEY);
+    }
+    localStorage.setItem(PAUSE_KEY,'1');
+    PAUSE_MIGRATED=true;
+    localStorage.setItem(CFG_VER_KEY,String(CFG_SCHEMA));
+  }
+}catch(e){}
 try{const o=JSON.parse(localStorage.getItem(CFG_KEY)||'{}');for(const [k,,lo,hi] of CFG_EDIT){const v=Number(o[k]);if(o[k]!==undefined&&o[k]!==''&&isFinite(v)&&v>=lo&&v<=hi)CFG[k]=v}}catch(e){}
+let autoPaused=AUTO_TRADING_PAUSED;
+try{if(Number(localStorage.getItem(CFG_VER_KEY))>=CFG_SCHEMA&&localStorage.getItem(PAUSE_KEY)==='0')autoPaused=false}catch(e){}
 // Test-only QA mode: ?qa=1&hold=3&tp=5&sl=3 → alag storage key, defaults unchanged
 const QP=new URLSearchParams(location.search);const QA=QP.get('qa')==='1';
 if(QA){const n=(k,lo,hi)=>{const v=Number(QP.get(k));return v>=lo&&v<=hi?v:null};
@@ -476,6 +496,13 @@ async function scanCycle(){
     const cs=Object.entries(cnt).map(([k,v])=>`${k} ${v}`).join(' · ')||'sab pehle se jaanche hue';
     if(!fresh.length){ag('rug','ok',`${todo.length} jaanche · ${cs}`);log('r','Koi naya coin market filter pass nahi hua — WAIT');return}
     const okList=fresh.filter(p=>{const r=rs.recs[p.baseToken.address];return r&&r.v==='PASS_SMALL'&&Date.now()-r.ts<RS_PASS_TTL*60e3});
+    if(autoPaused){
+      ag('rug','ok',okList.length?`${okList.length} PASS · auto-buy band`:`${cs} · auto-buy band`);
+      ag('size','ok','Auto trading band hai');
+      ag('exec','ok','Nayi kharidari band');
+      log('w',okList.length?`AUTO-BUY BAND (27 Nov tak): ${okList.map(p=>p.baseToken.symbol).slice(0,6).join(', ')} Shield PASS the, lekin koi nayi demo kharidari nahi hogi`:`AUTO-BUY BAND (27 Nov tak): scan aur Rug Shield chal rahe hain, nayi kharidari nahi`);
+      return;
+    }
     let pick=null,pbNote='';
     for(const p of okList.slice(0,3)){
       if(!(CFG.pullbackPct>0)){pick=p;break}
@@ -565,7 +592,7 @@ function renderTop(){const e=equityInr();const pnl=e-S.startInr;
   $('cashline').textContent=`Cash ${inr(S.cashInr,2)} · Open trades ${fx()?inr(openValueInr(),2):'₹—'}`;
   $('fxline').textContent=S.fx.rate?`USD→INR ${S.fx.rate.toFixed(2)} (${S.fx.src}, ${hhmm(S.fx.ts)} IST)`:'USD→INR: loading…';
   $('startBtn').textContent=S.running?'■ Stop':'▶ Start';$('startBtn').className='btn '+(S.running?'stop':'go');
-  $('status').textContent=S.running?`Chal raha hai · har 60s scan, har ${CFG.priceEveryMs/1000}s price`:'Ruka hua hai (stopped)';
+  $('status').textContent=S.running?(autoPaused?`Scan + Rug Shield chal raha hai · auto-buy 27 Nov tak band`:`Chal raha hai · har 60s scan, har ${CFG.priceEveryMs/1000}s price`):'Ruka hua hai (stopped)';
   $('cycle').textContent='cycle '+S.cycle;
   const ms=S.sessionMs+(S.running&&S.lastStart?Date.now()-S.lastStart:0);$('timer').textContent='⏱ '+dur(ms)}
 
@@ -612,15 +639,37 @@ function renderEq(){const cv=$('eq');const dpr=window.devicePixelRatio||1;const 
   pts.forEach((p,i)=>{i?x.lineTo(X(p[0]),Y(p[1])):x.moveTo(X(p[0]),Y(p[1]))});x.stroke();
   x.fillStyle='#7c8696';x.fillText(hhmm(t0).slice(0,5),L,H-4);x.textAlign='right';x.fillText(hhmm(t1).slice(0,5),W-R,H-4);x.textAlign='left'}
 
-function render(){renderTop();renderPositions();renderStats();renderTrace();renderClosed();renderEq();renderPipe();renderShield()}
+function render(){renderTop();renderPositions();renderStats();renderTrace();renderClosed();renderEq();renderPipe();renderShield();renderPause()}
+function renderPause(){
+  const ban=$('pauseBanner'),btn=$('resumeBtn'),text=$('pauseBannerText'),sub=$('pauseBannerSub');
+  if(!ban)return;
+  ban.style.display='block';
+  if(autoPaused){
+    text.textContent='Auto trading 27 Nov tak band hai (Vivaan जी ke kehne par). Sirf scan aur Rug Shield chal rahe hain.';
+    sub.textContent='Pehle se khule demo trades apne TP/SL/time-stop par chalenge. Nayi automatic kharidari nahi hogi.';
+    btn.textContent='Resume auto trading (demo)';
+  }else{
+    text.textContent='Auto trading wapas chalu hai (sirf demo paisa).';
+    sub.textContent='Aap ise dobara band kar sakte hain. Pehle se khule trades apne TP/SL par chal rahe hain.';
+    btn.textContent='Pause auto trading';
+  }
+}
+function setAutoPaused(on){
+  autoPaused=!!on;
+  try{localStorage.setItem(PAUSE_KEY,autoPaused?'1':'0')}catch(e){}
+  hidePending();
+  log(autoPaused?'w':'s',autoPaused?'Auto trading 27 Nov tak band hai (Vivaan जी ke kehne par). Sirf scan aur Rug Shield chal rahe hain.':'Auto trading wapas chalu (sirf demo paisa).');
+  render();
+}
 
 // ====================== CONTROLS ======================
 let tPx=null,tScan=null;
 function startLoops(){clearInterval(tPx);clearInterval(tScan);tPx=setInterval(priceCycle,CFG.priceEveryMs);tScan=setInterval(scanCycle,CFG.scanEveryMs);setTimeout(()=>{priceCycle();scanCycle()},300)}
 function stopLoops(){clearInterval(tPx);clearInterval(tScan)}
 $('startBtn').onclick=()=>{if(S.running){S.sessionMs+=Date.now()-S.lastStart;S.running=false;stopLoops();log('w','STOP — Vivaan जी ne bot roka. Khule trades ka price update bhi ruk gaya.');hidePending();AG.forEach(a=>agState[a[0]]={st:'',txt:'ruka hua'})}
-  else{S.running=true;S.lastStart=Date.now();log('s','START — Night Desk chalu (paper/demo). Rules: max '+CFG.perCoinPct+'% per coin, TP +'+CFG.tpPct+'%, SL -'+CFG.slPct+'%, time-stop '+(CFG.maxHoldMin>0?CFG.maxHoldMin+' min':'nahi')+', pullback entry '+(CFG.pullbackPct>0?CFG.pullbackPct+'%':'off')+', price har '+CFG.priceEveryMs/1000+'s.');startLoops()}
+  else{S.running=true;S.lastStart=Date.now();log('s','START — Night Desk chalu (paper/demo). Rules: max '+CFG.perCoinPct+'% per coin, TP +'+CFG.tpPct+'%, SL -'+CFG.slPct+'%, time-stop '+(CFG.maxHoldMin>0?CFG.maxHoldMin+' min':'nahi')+', pullback entry '+(CFG.pullbackPct>0?CFG.pullbackPct+'%':'off')+', price har '+CFG.priceEveryMs/1000+'s.'+(autoPaused?' Auto-buy 27 Nov tak band hai.':''));startLoops()}
   save();render()};
+$('resumeBtn').onclick=()=>{if(autoPaused){if(!confirm('Auto trading wapas chalu karein? Yeh sirf demo/paper paisa hai, asli trade nahi hoga.'))return;setAutoPaused(false)}else setAutoPaused(true)};
 $('resetBtn').onclick=()=>{const v=Math.round(Number($('startBalIn').value));if(!(v>=100)){alert('Kam se kam ₹100 rakhiye');return}
   if(!confirm(`Naya session ₹${v.toLocaleString('en-IN')} se shuru karein? Purana demo hisaab mit jayega.`))return;
   stopLoops();const fxs=S.fx,rss=S.rs;S=fresh(v);S.fx=fxs;S.rs=rss;log('s',`RESET — naya demo balance ${inr(v)}`);save();render()};
@@ -635,12 +684,13 @@ setInterval(followUps,60e3);
 window.addEventListener('resize',renderEq);
 rsInit();renderRsCfg();
 if(CFG_MIGRATED){log('s',`Settings update: naye defaults lagu — TP +${CFG.tpPct}%, SL -${CFG.slPct}%, time-stop ${CFG.maxHoldMin} min, size ${CFG.perCoinPct}%, pullback ${CFG.pullbackPct}%. Balance aur trade history waise hi hain. Pehle se khule trades apne purane TP/SL par chalenge.`);save()}
+if(PAUSE_MIGRATED){log('w','Auto trading 27 Nov tak band hai (Vivaan जी ke kehne par). Sirf scan aur Rug Shield chal rahe hain. Pehle se khule trades apne TP/SL/time-stop par chalenge.');save()}
 (async()=>{render();renderLog();await loadFx(true);followUps();
-  if(S.running){if(S.lastStart&&S.savedAt>S.lastStart)S.sessionMs+=S.savedAt-S.lastStart;S.lastStart=Date.now();log('w','Tab dobara khula — bot phir chalu. Jab tab band tha tab ke price moves miss hue (honest note).');startLoops()}
+  if(S.running){if(S.lastStart&&S.savedAt>S.lastStart)S.sessionMs+=S.savedAt-S.lastStart;S.lastStart=Date.now();log('w','Tab dobara khula — bot phir chalu. Jab tab band tha tab ke price moves miss hue (honest note).'+(autoPaused?' Auto-buy 27 Nov tak band hai.':''));startLoops()}
   else if(/[?&]autostart=1/.test(location.search)){$('startBtn').click()}
   render()})();
 if(QA)$('qaBadge').style.display='inline-block';
-window.__nd={S:()=>S,CFG,QA,RS,FU};
+window.__nd={S:()=>S,CFG,QA,RS,FU,autoPaused:()=>autoPaused,setAutoPaused,AUTO_TRADING_PAUSED,CFG_SCHEMA,PAUSE_KEY};
 </script>
 </body>
 </html>
